@@ -8,9 +8,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 from .voice import build_card
 
-FONT_DIR = r"C:\Windows\Fonts"
-F_SERIF = os.path.join(FONT_DIR, "yumin.ttf")      # 游明朝
-F_SERIF_DB = os.path.join(FONT_DIR, "yumindb.ttf")  # 游明朝 Demibold
+# 同梱フォント（Shippori明朝・OFL）。Windows/Linux どちらでも動く＝本番(Render)でもOK。
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fonts")
+F_SERIF = os.path.join(FONT_DIR, "ShipporiMincho-Regular.ttf")
+F_SERIF_DB = os.path.join(FONT_DIR, "ShipporiMincho-Bold.ttf")
 
 W, H = 1080, 1440
 MARGIN = 110
