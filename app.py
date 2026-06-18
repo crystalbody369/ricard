@@ -176,7 +176,10 @@ function copyInvite(){
 
 @app.route("/")
 def index():
-    return Response(PAGE, mimetype="text/html")
+    resp = Response(PAGE, mimetype="text/html")
+    # 常に最新ページを配る（古いキャッシュで新機能が動かないのを防ぐ）
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    return resp
 
 
 def _png(img):
