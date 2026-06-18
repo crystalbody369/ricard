@@ -108,6 +108,7 @@ function qs(id){ return document.getElementById(id); }
 function showCard(){
   var b = qs('me').value;
   if(!b){ alert('生年月日を選んでください'); return; }
+  try{ localStorage.setItem('ricard_birth', b); }catch(e){}
   var img = qs('cardImg');
   img.src = '/api/card?b=' + b + '&_=' + Date.now();
   img.style.display = 'block';
@@ -151,15 +152,22 @@ function copyInvite(){
   }, function(){ prompt('このリンクを送ってください', link); });
 }
 
-// 招待リンクで開かれたとき：相手の生年月日を入れてもらう
+// 起動時：前回の生年月日を思い出して今日のカードを自動表示／招待リンク処理
 (function(){
   var p = new URLSearchParams(location.search);
+  // 前回入れた生年月日を復元（端末内に保存・サーバーには送らない）
+  try{
+    var saved = localStorage.getItem('ricard_birth');
+    if(saved){ qs('me').value = saved; showCard(); }
+  }catch(e){}
   var en = p.get('en');
   if(en){
     qs('enA').value = en;
     qs('banner').textContent = 'あなたとの「縁」を見たい人がいます。あなたの生年月日を入れてください。';
     qs('banner').style.display = 'block';
     qs('enB').focus();
+  } else if(qs('me').value && !qs('enA').value){
+    qs('enA').value = qs('me').value;
   }
 })();
 </script>
