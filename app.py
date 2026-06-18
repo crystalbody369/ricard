@@ -89,7 +89,7 @@ PAGE = """<!doctype html>
     <label>お相手の生年月日</label>
     <input type="date" id="enB" min="1900-01-01" max="2025-12-31">
     <button onclick="showEn()">二人の縁を見る</button>
-    <button class="ghost" onclick="copyInvite()">この縁の招待リンクをコピー</button>
+    <button class="ghost" onclick="copyInvite()">この縁を相手に送る</button>
     <div class="result">
       <img id="enImg" alt="二人の縁カード">
       <div class="row hidden" id="enBtns">
@@ -147,9 +147,19 @@ function copyInvite(){
   var a = qs('enA').value || qs('me').value;
   if(!a){ alert('まずあなたの生年月日を選んでください'); return; }
   var link = location.origin + '/?en=' + a;
-  navigator.clipboard.writeText(link).then(function(){
-    alert('招待リンクをコピーしました。\\n相手に送ると、二人の縁が見られます。');
-  }, function(){ prompt('このリンクを送ってください', link); });
+  // スマホ：OSの共有メニュー（LINE・メール等）を開く
+  if(navigator.share){
+    navigator.share({ title:'理カード', text:'二人の縁、見てみない？', url: link }).catch(function(){});
+    return;
+  }
+  // PC等：クリップボードにコピー
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(link).then(function(){
+      alert('招待リンクをコピーしました。LINEやメールで相手に送ってください。');
+    }, function(){ prompt('このリンクを送ってください', link); });
+  } else {
+    prompt('このリンクを送ってください', link);
+  }
 }
 
 // 起動時：前回の生年月日を思い出して今日のカードを自動表示／招待リンク処理
