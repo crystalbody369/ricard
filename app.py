@@ -728,6 +728,9 @@ def admin():
             elif a == "ridoc_delete":
                 store.delete_ri_doc(request.form.get("doc_id", ""))
                 msg = "理を知識ベースから削除しました。"
+            elif a == "ri_import":
+                n = store.import_ri_seed()
+                msg = "同梱の理データを %d 件取り込みました。" % n
         except Exception as e:
             msg = "エラー: " + str(e)
 
@@ -813,6 +816,9 @@ def admin():
 
 <div class="card"><h2>理の知識ベース（{dcount}件・検索して使う）</h2>
 <p class="note">講話・事例・原則を1件ずつ追加。相談ごとにAIが<b>関係するものだけ自動で探して</b>使います。何件でも貯められます（大量OK）。※名前・団体名は書かないでください。</p>
+<form method="post" style="margin:0 0 12px"><input type="hidden" name="action" value="ri_import">
+<button type="submit" class="ghost">同梱の理データ（{seedn}件）をまとめて取り込む</button>
+<span class="note">　※あなたの記録・著作から作った理。重複は自動で飛ばします。</span></form>
 <table><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
 <form method="post" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
 <input type="hidden" name="action" value="ridoc_add">
@@ -822,7 +828,8 @@ def admin():
 <button type="submit">この理を知識ベースに追加</button></form></div>""".format(
         user=escape(me["username"]), msg=mb, spent=int(spent),
         crows=crows or "<tr><td colspan='5' class='note'>まだありません</td></tr>",
-        urows=urows, ri_extra=ri_extra, dcount=dcount, drows=drows)
+        urows=urows, ri_extra=ri_extra, dcount=dcount, drows=drows,
+        seedn=store.seed_count())
     return _shell("管理者", body)
 
 

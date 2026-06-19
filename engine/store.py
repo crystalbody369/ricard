@@ -95,6 +95,43 @@ def count_ri_docs():
         return conn.execute("SELECT COUNT(*) AS n FROM ri_docs").fetchone()["n"]
 
 
+def _seed_path():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "ri_seed.json")
+
+
+def seed_count():
+    p = _seed_path()
+    if not os.path.exists(p):
+        return 0
+    try:
+        with open(p, encoding="utf-8") as f:
+            return len(json.load(f))
+    except (ValueError, OSError):
+        return 0
+
+
+def import_ri_seed():
+    """同梱の ri_seed.json から、まだ無いタイトルの理を知識ベースへ取り込む。追加件数を返す。"""
+    _ensure_ri_docs()
+    p = _seed_path()
+    if not os.path.exists(p):
+        return 0
+    with open(p, encoding="utf-8") as f:
+        entries = json.load(f)
+    added = 0
+    with get_conn() as conn:
+        existing = set(r["title"] for r in conn.execute("SELECT title FROM ri_docs").fetchall())
+        for e in entries:
+            t = (e.get("title") or "").strip()
+            b = (e.get("body") or "").strip()
+            if not t or not b or t in existing:
+                continue
+            conn.execute("INSERT INTO ri_docs(title, body) VALUES(?, ?)", (t, b))
+            existing.add(t)
+            added += 1
+    return added
+
+
 def _bigrams(s):
     s = (s or "").replace("\n", "").replace("\r", "").replace(" ", "").replace("　", "")
     if len(s) < 2:
