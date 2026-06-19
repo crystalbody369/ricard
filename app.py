@@ -782,11 +782,13 @@ def admin():
 <div class="card"><h2>利用者</h2>
 <table><tr><th>ユーザー</th><th>状態</th><th>期限</th><th></th></tr>{urows}</table></div>
 
-<div class="card"><h2>理の追記（あなただけの理）</h2>
-<p class="note">ここに書いた理を、AIが相談で大切にします。※名前・団体名は書かないでください（普遍的な原則のみ）。</p>
+<div class="card"><h2>理の追記（AIに教える理）</h2>
+<p class="note">ここに書いた理を、AIが<b>全ユーザーの相談</b>で参考にして答えます。※名前・団体名は書かないでください（普遍的な原則のみ）。長いほど1回のコストが上がるので、要点を絞るのがおすすめです。</p>
 <form method="post"><input type="hidden" name="action" value="ri_save">
-<textarea name="ri_extra" rows="10" placeholder="例：急いては事を仕損じる。焦りは好転の前ぶれのこともある…">{ri_extra}</textarea>
-<button type="submit">理を保存</button></form></div>""".format(
+<textarea name="ri_extra" id="ri_extra" rows="10" maxlength="5000" oninput="document.getElementById('richars').textContent=this.value.length" placeholder="例：急いては事を仕損じる。焦りは好転の前ぶれのこともある…">{ri_extra}</textarea>
+<div class="note" style="text-align:right"><span id="richars">0</span> / 5000 字</div>
+<button type="submit">理を保存</button></form>
+<script>document.getElementById('richars').textContent=document.getElementById('ri_extra').value.length;</script></div>""".format(
         user=escape(me["username"]), msg=mb, spent=int(spent),
         crows=crows or "<tr><td colspan='5' class='note'>まだありません</td></tr>",
         urows=urows, ri_extra=ri_extra)
