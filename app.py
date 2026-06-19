@@ -996,21 +996,20 @@ def admin():
 <button type="submit">理を保存</button></form>
 <script>document.getElementById('richars').textContent=document.getElementById('ri_extra').value.length;</script></div>
 
-<div class="card"><h2>理の知識ベース（{dcount}件・検索して使う）</h2>
+<div class="card"><h2>理の知識ベース（{dcount}件）</h2>
 <p class="note">講話・事例・原則を1件ずつ追加。相談ごとにAIが<b>関係するものだけ自動で探して</b>使います。何件でも貯められます（大量OK）。※名前・団体名は書かないでください。</p>
 {import_block}
-<input type="text" id="kbsearch" oninput="filterKB()" placeholder="理を検索（お金 / 縁 / 焦り / 言葉 など）">
-<div class="note" style="margin:4px 2px">表示中 <span id="kbcount">{dcount}</span> 件</div>
-<div class="note" style="margin:2px">行をクリックすると全文が開きます。枠内にマウスを合わせると↑↓キー・PageUp/Down でも動きます。</div>
-<div id="kbbox" tabindex="0" style="max-height:380px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px; outline:none;">
-<table id="kbtable"><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
-</div>
-<form method="post" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
-<input type="hidden" name="action" value="ridoc_add">
+<form method="post"><input type="hidden" name="action" value="ridoc_add">
 <label>タイトル（例：落ちたお金の理）</label><input type="text" name="doc_title">
 <label>本文（理の内容・原則・事例）</label>
 <textarea name="doc_body" rows="6" maxlength="20000" placeholder="例：お金は神様からの預かりもの。落ちた小銭は気づきのサイン。急がず、まず身の回りを整える…"></textarea>
-<button type="submit">この理を知識ベースに追加</button></form></div>""".format(
+<button type="submit">この理を知識ベースに追加</button></form>
+<div class="note" style="margin-top:18px;border-top:1px solid var(--line);padding-top:12px">▼ 登録済みの理（一覧・検索）— 表示中 <span id="kbcount">{dcount}</span> 件</div>
+<input type="text" id="kbsearch" oninput="filterKB()" placeholder="理を検索（お金 / 縁 / 焦り / 言葉 など）">
+<div class="note" style="margin:2px">行をクリックすると全文が開きます。枠内にマウスを合わせると↑↓キー・PageUp/Down でも動きます。</div>
+<div id="kbbox" tabindex="0" style="max-height:380px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px; outline:none;">
+<table id="kbtable"><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
+</div></div>""".format(
         user=escape(me["username"]), msg=mb, spent=int(spent),
         crows=crows or "<tr><td colspan='5' class='note'>まだありません</td></tr>",
         urows=urows, ri_extra=ri_extra, dcount=dcount, drows=drows,
