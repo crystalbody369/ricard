@@ -612,6 +612,13 @@ window.filterKB=function(){
  }
  var c=document.getElementById('kbcount'); if(c) c.textContent=n;
 };
+window.toggleFull=function(td){
+ var s=td.querySelector('.snip'), f=td.querySelector('.full');
+ if(!f) return;
+ var open=(f.style.display==='none');
+ f.style.display=open?'block':'none';
+ if(s) s.style.display=open?'none':'block';
+};
 (function(){
  var box=document.getElementById('kbbox'); if(!box) return;
  var over=false;
@@ -810,12 +817,16 @@ def admin():
     drows = ""
     for d in store.list_ri_docs():
         snip = (d["body"][:44] + "…") if len(d["body"]) > 44 else d["body"]
-        drows += ("<tr data-s=\"%s\"><td><b>%s</b><br><span class='note'>%s</span></td><td>%s</td>"
+        drows += ("<tr data-s=\"%s\"><td onclick=\"toggleFull(this)\" style=\"cursor:pointer\"><b>%s</b><br>"
+                  "<span class='note snip'>%s</span>"
+                  "<div class='full' style='display:none;font-size:13px;line-height:1.9;margin-top:6px;color:var(--ink)'>%s</div></td>"
+                  "<td>%s</td>"
                   "<td><form method='post' style='display:inline' onsubmit=\"return confirm('削除しますか？')\">"
                   "<input type='hidden' name='action' value='ridoc_delete'>"
                   "<input type='hidden' name='doc_id' value='%s'>"
                   "<button class='mini ghost'>削除</button></form></td></tr>") % (
-            escape(d["title"] + d["body"]), escape(d["title"]), escape(snip), d["created_at"], d["id"])
+            escape(d["title"] + d["body"]), escape(d["title"]), escape(snip),
+            escape(d["body"]), d["created_at"], d["id"])
     drows = drows or "<tr><td colspan='3' class='note'>まだありません</td></tr>"
 
     # 取り込みボタン（未取り込みがある時だけ出す。済みなら「取り込み済み」表示）
@@ -860,7 +871,7 @@ def admin():
 {import_block}
 <input type="text" id="kbsearch" oninput="filterKB()" placeholder="理を検索（お金 / 縁 / 焦り / 言葉 など）">
 <div class="note" style="margin:4px 2px">表示中 <span id="kbcount">{dcount}</span> 件</div>
-<div class="note" style="margin:2px">枠内にマウスを合わせる（またはクリック）と、↑↓キー・PageUp/Down でも動きます。</div>
+<div class="note" style="margin:2px">行をクリックすると全文が開きます。枠内にマウスを合わせると↑↓キー・PageUp/Down でも動きます。</div>
 <div id="kbbox" tabindex="0" style="max-height:380px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px; outline:none;">
 <table id="kbtable"><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
 </div>
