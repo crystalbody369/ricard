@@ -51,27 +51,33 @@ def init_auth():
             conn.execute("ALTER TABLE users ADD COLUMN free_used INTEGER DEFAULT 0")
         if "credits" not in cols:
             conn.execute("ALTER TABLE users ADD COLUMN credits INTEGER DEFAULT 0")
+        if "free_quota" not in cols:   # この利用者に与えられた無料回数（NULL=既定値）
+            conn.execute("ALTER TABLE users ADD COLUMN free_quota INTEGER")
+        ic_cols = [r[1] for r in conn.execute("PRAGMA table_info(invite_codes)").fetchall()]
+        if "grant_free" not in ic_cols:   # このコードで登録した人に与える無料回数（NULL=既定）
+            conn.execute("ALTER TABLE invite_codes ADD COLUMN grant_free INTEGER")
 
 
-def get_balance(username, free_quota):
-    """無料残り・購入クレジット・合計を返す。"""
+def get_balance(username, default_free):
+    """無料残り・購入クレジット・合計を返す。各利用者の free_quota（無ければ既定値）を使う。"""
     with store.get_conn() as conn:
-        r = conn.execute("SELECT free_used, credits, is_admin FROM users WHERE username=?",
+        r = conn.execute("SELECT free_used, credits, is_admin, free_quota FROM users WHERE username=?",
                          (username,)).fetchone()
     if not r:
         return {"free_remaining": 0, "credits": 0, "total": 0, "unlimited": False}
     if r["is_admin"]:
         return {"free_remaining": 0, "credits": 0, "total": 0, "unlimited": True}
-    free_rem = max(0, int(free_quota) - (r["free_used"] or 0))
+    fq = r["free_quota"] if r["free_quota"] is not None else int(default_free)
+    free_rem = max(0, fq - (r["free_used"] or 0))
     credits = r["credits"] or 0
     return {"free_remaining": free_rem, "credits": credits,
             "total": free_rem + credits, "unlimited": False}
 
 
-def consume_consult(username, free_quota):
+def consume_consult(username, default_free):
     """相談を1回消費（無料枠を先に、無ければクレジット）。成功時 True＋残数。"""
     with store.get_conn() as conn:
-        r = conn.execute("SELECT free_used, credits, is_admin FROM users WHERE username=?",
+        r = conn.execute("SELECT free_used, credits, is_admin, free_quota FROM users WHERE username=?",
                          (username,)).fetchone()
         if not r:
             return {"ok": False}
@@ -79,9 +85,10 @@ def consume_consult(username, free_quota):
             return {"ok": True, "unlimited": True}
         free_used = r["free_used"] or 0
         credits = r["credits"] or 0
-        if free_used < int(free_quota):
+        fq = r["free_quota"] if r["free_quota"] is not None else int(default_free)
+        if free_used < fq:
             conn.execute("UPDATE users SET free_used=free_used+1 WHERE username=?", (username,))
-            return {"ok": True, "free_remaining": int(free_quota) - free_used - 1, "credits": credits}
+            return {"ok": True, "free_remaining": fq - free_used - 1, "credits": credits}
         if credits > 0:
             conn.execute("UPDATE users SET credits=credits-1 WHERE username=?", (username,))
             return {"ok": True, "free_remaining": 0, "credits": credits - 1}
@@ -122,16 +129,16 @@ def add_user(username, password, days=None, is_admin=False, note=""):
 
 
 # ── 紹介コード ──────────────────────────────────────
-def create_code(code, max_uses=0, grant_days=None, expires_on=None, note=""):
+def create_code(code, max_uses=0, grant_days=None, grant_free=None, expires_on=None, note=""):
     code = (code or "").strip()
     if not code:
         raise ValueError("コードを入力してください")
     with store.get_conn() as conn:
         conn.execute(
             """INSERT OR REPLACE INTO invite_codes
-               (code, enabled, max_uses, used_count, expires_on, grant_days, note)
-               VALUES (?, 1, ?, COALESCE((SELECT used_count FROM invite_codes WHERE code=?),0), ?, ?, ?)""",
-            (code, int(max_uses), code, expires_on, grant_days, note))
+               (code, enabled, max_uses, used_count, expires_on, grant_days, grant_free, note)
+               VALUES (?, 1, ?, COALESCE((SELECT used_count FROM invite_codes WHERE code=?),0), ?, ?, ?, ?)""",
+            (code, int(max_uses), code, expires_on, grant_days, grant_free, note))
 
 
 def list_codes():
@@ -146,7 +153,7 @@ def list_codes():
             "code": r["code"], "enabled": bool(r["enabled"]),
             "max_uses": r["max_uses"], "used_count": r["used_count"],
             "expires_on": r["expires_on"] or "無期限",
-            "grant_days": r["grant_days"], "note": r["note"] or "",
+            "grant_days": r["grant_days"], "grant_free": r["grant_free"], "note": r["note"] or "",
             "状態": ("停止中" if not r["enabled"] else "期限切れ" if expired
                     else "上限到達" if full else "有効"),
         })
@@ -197,10 +204,11 @@ def register_with_code(code, username, password):
         gd = cr["grant_days"]
         expires_on = ((datetime.date.today() + datetime.timedelta(days=int(gd))).isoformat()
                       if gd is not None else None)
+        gf = cr["grant_free"]   # このコードが与える無料回数（NULL=既定）
         conn.execute(
-            """INSERT INTO users (username, pw_hash, salt, expires_on, enabled, is_admin, note)
-               VALUES (?, ?, ?, ?, 1, 0, ?)""",
-            (username, pwh, salt, expires_on, "紹介:" + code))
+            """INSERT INTO users (username, pw_hash, salt, expires_on, enabled, is_admin, note, free_quota)
+               VALUES (?, ?, ?, ?, 1, 0, ?, ?)""",
+            (username, pwh, salt, expires_on, "紹介:" + code, gf))
         conn.execute("UPDATE invite_codes SET used_count=used_count+1 WHERE code=?", (code,))
     return expires_on
 

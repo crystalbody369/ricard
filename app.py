@@ -837,6 +837,7 @@ def admin():
                     request.form.get("code", ""),
                     max_uses=int(request.form.get("max_uses") or 0),
                     grant_days=(int(request.form["grant_days"]) if request.form.get("grant_days") else None),
+                    grant_free=(int(request.form["grant_free"]) if request.form.get("grant_free") else None),
                     note=request.form.get("note", ""))
                 msg = "紹介コードを作成しました。"
             elif a == "code_toggle":
@@ -877,6 +878,8 @@ def admin():
     for c in auth.list_codes():
         uses = ("%d / %s" % (c["used_count"], "∞" if not c["max_uses"] else c["max_uses"]))
         gd = ("%d日" % c["grant_days"]) if c["grant_days"] is not None else "無期限"
+        gf = ("無料%d回" % c["grant_free"]) if c.get("grant_free") is not None else "無料既定"
+        gd = gd + "・" + gf
         to = "off" if c["enabled"] else "on"
         crows += ("<tr><td><b>%s</b></td><td>%s</td><td>%s</td><td>付与%s</td>"
                   "<td><form method='post' style='display:inline'><input type='hidden' name='action' value='code_toggle'>"
@@ -953,6 +956,7 @@ def admin():
 <label>新しいコード（例：RICARD2026）</label><input type="text" name="code">
 <div class="row"><div style="flex:1"><label>使用上限（0=無制限）</label><input type="number" name="max_uses" value="0"></div>
 <div style="flex:1"><label>付与する利用日数（空=無期限）</label><input type="number" name="grant_days" placeholder="空=無期限"></div></div>
+<label>無料お試し回数（空＝既定の3回）</label><input type="number" name="grant_free" placeholder="空=既定3">
 <label>メモ（任意）</label><input type="text" name="note">
 <button type="submit">コードを発行</button></form></div>
 
