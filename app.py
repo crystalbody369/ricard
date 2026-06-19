@@ -9,6 +9,7 @@ Flask。カード画像はサーバー側でローカル生成して返す（外
 import io
 import os
 import sys
+import json
 import secrets
 import datetime
 from functools import wraps
@@ -33,6 +34,12 @@ from engine import auth
 
 CONSULT_MAX_CHARS = 500   # 入力の蓋（コスト上限を固定する）
 CONSULT_SIT_CHARS = 300   # 気持ち・状況欄の上限
+
+# 課金（買い切りの回数パック）
+FREE_CONSULTS = int(os.environ.get("RICARD_FREE_CONSULTS", "3"))   # 無料お試し回数
+PACK_PRICE = int(os.environ.get("RICARD_PACK_PRICE", "500"))       # パック価格(円)
+PACK_CREDITS = int(os.environ.get("RICARD_PACK_CREDITS", "30"))    # 1パックの回数
+PACK_NAME = "理カード 相談%d回パック" % PACK_CREDITS
 CONSULT_IP_DAILY = 10     # サーバー側の最終防衛：1IP/1日の相談回数（端末側3回とは別の網）
 
 
@@ -208,6 +215,7 @@ PAGE = """<!doctype html>
     <p class="note" style="text-align:left;margin:4px 0 0" data-i18n="csithint">※気持ちや状況も書くほど、あなたに合った観方になります。</p>
     <button onclick="askConsult()" id="cbtn" data-i18n="btnconsult">理に観てもらう</button>
     <p class="note" style="text-align:left" data-i18n="consultprivacy">※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。</p>
+    <button class="ghost hidden" id="cbuy" onclick="buyCredits()" data-i18n="btnbuy" style="margin-top:8px">クレジットを購入（30回 ¥500）</button>
     <div id="cresult" class="detail" style="white-space:pre-wrap; line-height:1.9;"></div>
   </div>
 
@@ -229,7 +237,8 @@ var I18N = {
        cplaceholder:'例：道に鳥が死んでいた。朝、大きな雲を見た。古い友人に偶然会った。',
        btnconsult:'理に観てもらう', consultprivacy:'※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。',
        csitlabel:'今の気持ち・状況・取り組んでいること（任意）', csitph:'例：新しい仕事を始めたばかりで不安。いろいろ手を広げて落ち着かない。',
-       csithint:'※気持ちや状況も書くほど、あなたに合った観方になります。',
+       csithint:'※気持ちや状況も書くほど、あなたに合った観方になります。', btnbuy:'クレジットを購入（30回 ¥500）',
+       paidthanks:'ご購入ありがとうございます。回数が追加されました。',
        remain:'残り{n}回', consultempty:'出来事を書いてください。', consultlimit:'今日の無料分（3回）は終わりました。また明日どうぞ。',
        consultwait:'理で観ています…', consultfail:'うまく言葉にできませんでした。少し時間をおいて、もう一度お試しください。',
        logout:'ログアウト',
@@ -244,7 +253,8 @@ var I18N = {
        cplaceholder:'例如：路上有隻死掉的鳥。早上看到一大片雲。偶然遇見老朋友。',
        btnconsult:'請理為我觀照', consultprivacy:'※輸入的文字會送往AI（Claude）以產生回應，不會保存文字。',
        csitlabel:'此刻的心情・處境・正在投入的事（可選）', csitph:'例如：剛開始新工作很不安，手伸得太廣靜不下來。',
-       csithint:'※越是寫下心情與處境，越能得到貼近你的觀照。',
+       csithint:'※越是寫下心情與處境，越能得到貼近你的觀照。', btnbuy:'購買點數（30次 ¥500）',
+       paidthanks:'感謝您的購買，次數已增加。',
        remain:'剩餘{n}次', consultempty:'請先寫下事情。', consultlimit:'今天的免費次數（3次）已用完，明天再來。',
        consultwait:'正以理觀照中…', consultfail:'這次沒能好好回應。請稍後再試一次。',
        logout:'登出',
@@ -258,7 +268,7 @@ function applyI18n(){
   var phs = document.querySelectorAll('[data-ph]');
   for(var j=0;j<phs.length;j++){ var pk=phs[j].getAttribute('data-ph'); if(t[pk]!==undefined) phs[j].placeholder = t[pk]; }
   document.documentElement.lang = (LANG==='zh' ? 'zh-Hant' : 'ja');
-  updateRemain();
+  refreshBalance();
 }
 function setLang(l){
   LANG = l; try{ localStorage.setItem('ricard_lang', l); }catch(e){}
@@ -358,45 +368,43 @@ function copyInvite(){
   }
 }
 
-// ── 理に相談する（無料は1日3回・端末内でカウント）──────────────
-var CFREE = 3;
-function consultCount(){
-  var today = localToday(), n = 0;
-  try{
-    if(localStorage.getItem('ricard_consult_date') === today){ n = parseInt(localStorage.getItem('ricard_consult_count')||'0',10)||0; }
-    else { localStorage.setItem('ricard_consult_date', today); localStorage.setItem('ricard_consult_count','0'); }
-  }catch(e){}
-  return n;
-}
-function consultRemain(){ return Math.max(0, CFREE - consultCount()); }
-function updateRemain(){
-  var el = qs('cremain'); if(!el) return;
+// ── 理に相談する（無料お試し＋購入クレジット・サーバーで管理）──────────────
+function renderBalance(b){
+  var el = qs('cremain'); if(!el || !b) return;
   var t = I18N[LANG] || I18N.ja;
-  el.textContent = (t.remain || '残り{n}回').replace('{n}', consultRemain());
+  if(b.unlimited){ el.textContent = '∞'; if(qs('cbuy')) qs('cbuy').classList.add('hidden'); return; }
+  el.textContent = (t.remain || '残り{n}回').replace('{n}', b.total);
+  if(qs('cbuy')) qs('cbuy').classList.toggle('hidden', b.total > 0);
 }
-function bumpConsult(){
-  var today = localToday(), n = consultCount() + 1;
-  try{ localStorage.setItem('ricard_consult_date', today); localStorage.setItem('ricard_consult_count', String(n)); }catch(e){}
-  updateRemain();
+function refreshBalance(){
+  fetch('/api/balance').then(function(r){ return r.json(); }).then(renderBalance).catch(function(){});
 }
 async function askConsult(){
   var t = I18N[LANG] || I18N.ja;
   var ev = qs('cevent').value.trim();
   if(!ev){ alert(t.consultempty); return; }
-  if(consultRemain() <= 0){ alert(t.consultlimit); return; }
+  var sit = qs('csituation') ? qs('csituation').value.trim() : '';
   var btn = qs('cbtn'), res = qs('cresult'), old = btn.textContent;
   btn.disabled = true; btn.textContent = t.consultwait;
   res.style.display = 'block'; res.textContent = t.consultwait;
   try{
-    var sit = qs('csituation') ? qs('csituation').value.trim() : '';
     var r = await fetch('/api/consult', {method:'POST', headers:{'Content-Type':'application/json'},
                         body: JSON.stringify({event: ev, situation: sit, lang: LANG})});
     var j = await r.json();
     res.textContent = j.text || t.consultfail;
-    if(j.ok){ bumpConsult(); }
+    if(j.balance) renderBalance(j.balance);
+    if(j.need_purchase && qs('cbuy')) qs('cbuy').classList.remove('hidden');
   }catch(e){ res.textContent = t.consultfail; }
   btn.disabled = false; btn.textContent = old;
   res.scrollIntoView({behavior:'smooth', block:'center'});
+}
+async function buyCredits(){
+  try{
+    var r = await fetch('/api/checkout', {method:'POST'});
+    var j = await r.json();
+    if(j.ok && j.url){ window.location = j.url; }
+    else { alert(j.text || '準備中です'); }
+  }catch(e){ alert('準備中です'); }
 }
 
 function renderDetail(j){
@@ -428,6 +436,11 @@ function showDetail(){
   if(en){
     qs('enB').value = en;
     qs('banner').textContent = 'あなたとの「縁」を見たい人からの招待です。あなたの生年月日は「設定」から入れてください。';
+    qs('banner').style.display = 'block';
+  }
+  if(p.get('paid') === '1'){
+    var tt = I18N[LANG] || I18N.ja;
+    qs('banner').textContent = tt.paidthanks || 'ご購入ありがとうございます。';
     qs('banner').style.display = 'block';
   }
   // 生年月日はアカウントから復元（新規登録者はまっさら）
@@ -552,6 +565,12 @@ def api_consult():
     if len(event) > CONSULT_MAX_CHARS:      # 入力の蓋（長文を物理的に拒否）
         event = event[:CONSULT_MAX_CHARS]
     situation = (data.get("situation") or "").strip()[:CONSULT_SIT_CHARS]
+    u = _current_user()
+    bal = auth.get_balance(u["username"], FREE_CONSULTS)
+    if not bal["unlimited"] and bal["total"] <= 0:    # 残数なし＝購入へ
+        msg = ("無料のお試し分が終わりました。続けるには、下のボタンからクレジットをご購入ください。"
+               if lang == "ja" else "免費試用次數已用完。請從下方按鈕購買點數以繼續。")
+        return jsonify({"ok": False, "need_purchase": True, "text": msg, "balance": bal}), 200
     ip = _client_ip()
     if _ip_over_limit(ip):                   # サーバー側IP制限（端末カウントのすり抜け対策）
         msg = "今日のご利用が多いため、いったんお休みです。また明日どうぞ。" if lang == "ja" \
@@ -561,7 +580,79 @@ def api_consult():
     result = consult(event, lang, kb_docs=kb, situation=situation)
     if result.get("ok"):
         _ip_bump(ip)                         # 成功時のみカウント
+        auth.consume_consult(u["username"], FREE_CONSULTS)   # 成功時のみ1回消費
+        result["balance"] = auth.get_balance(u["username"], FREE_CONSULTS)
     return jsonify(result)
+
+
+@app.route("/api/balance")
+@login_required
+def api_balance():
+    u = _current_user()
+    b = auth.get_balance(u["username"], FREE_CONSULTS)
+    b["pack_price"] = PACK_PRICE
+    b["pack_credits"] = PACK_CREDITS
+    return jsonify(b)
+
+
+@app.route("/api/checkout", methods=["POST"])
+@login_required
+def api_checkout():
+    u = _current_user()
+    key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
+    if not key:
+        return jsonify({"ok": False, "text": "購入機能は現在準備中です。"})
+    try:
+        import stripe
+        stripe.api_key = key
+        base = request.url_root.rstrip("/")
+        sess = stripe.checkout.Session.create(
+            mode="payment",
+            line_items=[{
+                "price_data": {
+                    "currency": "jpy",
+                    "unit_amount": PACK_PRICE,
+                    "product_data": {"name": PACK_NAME},
+                },
+                "quantity": 1,
+            }],
+            metadata={"username": u["username"], "credits": str(PACK_CREDITS)},
+            success_url=base + "/?paid=1",
+            cancel_url=base + "/?paid=0",
+        )
+        return jsonify({"ok": True, "url": sess.url})
+    except Exception:
+        return jsonify({"ok": False, "text": "決済の開始に失敗しました。少し時間をおいてお試しください。"})
+
+
+@app.route("/api/stripe-webhook", methods=["POST"])
+def stripe_webhook():
+    key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
+    if not key:
+        return ("", 200)
+    import stripe
+    stripe.api_key = key
+    wh = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
+    payload = request.get_data()
+    sig = request.headers.get("Stripe-Signature", "")
+    try:
+        if wh:
+            event = stripe.Webhook.construct_event(payload, sig, wh)
+        else:
+            event = json.loads(payload.decode("utf-8"))
+    except Exception:
+        return ("bad signature", 400)
+    if event.get("type") == "checkout.session.completed":
+        obj = event["data"]["object"]
+        meta = obj.get("metadata") or {}
+        uname = meta.get("username")
+        try:
+            n = int(meta.get("credits") or 0)
+        except (TypeError, ValueError):
+            n = 0
+        if uname and n > 0:
+            auth.add_credits(uname, n)
+    return ("", 200)
 
 
 def _shell(title, body):

@@ -3,3 +3,4 @@ pillow
 flask
 gunicorn
 anthropic
+stripe

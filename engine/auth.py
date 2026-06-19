@@ -45,6 +45,53 @@ def init_auth():
                 note        TEXT DEFAULT '',
                 created_at  TEXT DEFAULT (datetime('now','localtime'))
             )""")
+        # 課金用カラムの移行（無料お試しの使用回数・購入クレジット）
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "free_used" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN free_used INTEGER DEFAULT 0")
+        if "credits" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN credits INTEGER DEFAULT 0")
+
+
+def get_balance(username, free_quota):
+    """無料残り・購入クレジット・合計を返す。"""
+    with store.get_conn() as conn:
+        r = conn.execute("SELECT free_used, credits, is_admin FROM users WHERE username=?",
+                         (username,)).fetchone()
+    if not r:
+        return {"free_remaining": 0, "credits": 0, "total": 0, "unlimited": False}
+    if r["is_admin"]:
+        return {"free_remaining": 0, "credits": 0, "total": 0, "unlimited": True}
+    free_rem = max(0, int(free_quota) - (r["free_used"] or 0))
+    credits = r["credits"] or 0
+    return {"free_remaining": free_rem, "credits": credits,
+            "total": free_rem + credits, "unlimited": False}
+
+
+def consume_consult(username, free_quota):
+    """相談を1回消費（無料枠を先に、無ければクレジット）。成功時 True＋残数。"""
+    with store.get_conn() as conn:
+        r = conn.execute("SELECT free_used, credits, is_admin FROM users WHERE username=?",
+                         (username,)).fetchone()
+        if not r:
+            return {"ok": False}
+        if r["is_admin"]:
+            return {"ok": True, "unlimited": True}
+        free_used = r["free_used"] or 0
+        credits = r["credits"] or 0
+        if free_used < int(free_quota):
+            conn.execute("UPDATE users SET free_used=free_used+1 WHERE username=?", (username,))
+            return {"ok": True, "free_remaining": int(free_quota) - free_used - 1, "credits": credits}
+        if credits > 0:
+            conn.execute("UPDATE users SET credits=credits-1 WHERE username=?", (username,))
+            return {"ok": True, "free_remaining": 0, "credits": credits - 1}
+        return {"ok": False, "no_balance": True}
+
+
+def add_credits(username, n):
+    with store.get_conn() as conn:
+        conn.execute("UPDATE users SET credits=COALESCE(credits,0)+? WHERE username=?",
+                     (int(n), username))
 
 
 def _hash(password, salt_hex):
