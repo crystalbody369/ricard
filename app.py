@@ -612,6 +612,22 @@ window.filterKB=function(){
  }
  var c=document.getElementById('kbcount'); if(c) c.textContent=n;
 };
+(function(){
+ var box=document.getElementById('kbbox'); if(!box) return;
+ var over=false;
+ box.addEventListener('mouseenter',function(){over=true;});
+ box.addEventListener('mouseleave',function(){over=false;});
+ document.addEventListener('keydown',function(e){
+  if(!(over||document.activeElement===box)) return;
+  var step=44;
+  if(e.key==='ArrowDown'){box.scrollTop+=step;e.preventDefault();}
+  else if(e.key==='ArrowUp'){box.scrollTop-=step;e.preventDefault();}
+  else if(e.key==='PageDown'||e.key===' '){box.scrollTop+=box.clientHeight*0.9;e.preventDefault();}
+  else if(e.key==='PageUp'){box.scrollTop-=box.clientHeight*0.9;e.preventDefault();}
+  else if(e.key==='Home'){box.scrollTop=0;e.preventDefault();}
+  else if(e.key==='End'){box.scrollTop=box.scrollHeight;e.preventDefault();}
+ });
+})();
 </script>
 </div></body></html>""",
                     mimetype="text/html")
@@ -835,7 +851,8 @@ def admin():
 <span class="note">　※あなたの記録・著作から作った理。重複は自動で飛ばします。</span></form>
 <input type="text" id="kbsearch" oninput="filterKB()" placeholder="理を検索（お金 / 縁 / 焦り / 言葉 など）">
 <div class="note" style="margin:4px 2px">表示中 <span id="kbcount">{dcount}</span> 件</div>
-<div style="max-height:380px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px;">
+<div class="note" style="margin:2px">枠内にマウスを合わせる（またはクリック）と、↑↓キー・PageUp/Down でも動きます。</div>
+<div id="kbbox" tabindex="0" style="max-height:380px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px; outline:none;">
 <table id="kbtable"><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
 </div>
 <form method="post" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
