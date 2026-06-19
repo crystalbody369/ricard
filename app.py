@@ -854,6 +854,9 @@ def admin():
             elif a == "user_extend":
                 auth.extend_days(request.form.get("username", ""), 30)
                 msg = "利用期限を30日延長しました。"
+            elif a == "user_grant":
+                auth.add_credits(request.form.get("username", ""), PACK_CREDITS)
+                msg = "%d回ぶんのクレジットを付与しました。" % PACK_CREDITS
             elif a == "user_delete":
                 auth.delete_user(request.form.get("username", ""))
                 msg = "利用者を削除しました。"
@@ -896,20 +899,30 @@ def admin():
     for u in auth.list_users():
         to = "off" if u["enabled"] else "on"
         admin_tag = " 👑" if u["is_admin"] else ""
+        if u["is_admin"]:
+            bal_txt = "∞"
+        else:
+            quota = u["free_quota"] if u["free_quota"] is not None else FREE_CONSULTS
+            free_rem = max(0, quota - u["free_used"])
+            bal_txt = "残%d（無料%d/%d・購入%d）" % (free_rem + u["credits"], free_rem, quota, u["credits"])
         acts = ""
         if not u["is_admin"]:
             acts = ("<form method='post' style='display:inline'><input type='hidden' name='action' value='user_toggle'>"
                     "<input type='hidden' name='username' value='%s'><input type='hidden' name='to' value='%s'>"
                     "<button class='mini ghost'>%s</button></form>"
+                    "<form method='post' style='display:inline'><input type='hidden' name='action' value='user_grant'>"
+                    "<input type='hidden' name='username' value='%s'><button class='mini ghost'>+%d回</button></form>"
                     "<form method='post' style='display:inline'><input type='hidden' name='action' value='user_extend'>"
                     "<input type='hidden' name='username' value='%s'><button class='mini ghost'>+30日</button></form>"
                     "<form method='post' style='display:inline' onsubmit=\"return confirm('削除しますか？')\">"
                     "<input type='hidden' name='action' value='user_delete'><input type='hidden' name='username' value='%s'>"
                     "<button class='mini ghost'>削除</button></form>") % (
                 escape(u["username"]), to, ("停止" if u["enabled"] else "再開"),
+                escape(u["username"]), PACK_CREDITS,
                 escape(u["username"]), escape(u["username"]))
-        urows += "<tr><td><b>%s</b>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
-            escape(u["username"]), admin_tag, escape(u["状態"]), escape(str(u["expires_on"])), acts)
+        urows += "<tr><td><b>%s</b>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+            escape(u["username"]), admin_tag, escape(u["状態"]), escape(str(u["expires_on"])),
+            escape(bal_txt), acts)
 
     ri_extra = escape(store.get_setting("ri_extra", "") or "")
     spent = store.spent_today()
@@ -961,7 +974,7 @@ def admin():
 <button type="submit">コードを発行</button></form></div>
 
 <div class="card"><h2>利用者</h2>
-<table><tr><th>ユーザー</th><th>状態</th><th>期限</th><th></th></tr>{urows}</table></div>
+<table><tr><th>ユーザー</th><th>状態</th><th>期限</th><th>残数</th><th></th></tr>{urows}</table></div>
 
 <div class="card"><h2>理の追記（AIに教える理）</h2>
 <p class="note">ここに書いた理を、AIが<b>全ユーザーの相談</b>で参考にして答えます。※名前・団体名は書かないでください（普遍的な原則のみ）。長いほど1回のコストが上がるので、要点を絞るのがおすすめです。</p>

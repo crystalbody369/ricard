@@ -266,7 +266,8 @@ def check_active(username):
 def list_users():
     with store.get_conn() as conn:
         rows = conn.execute(
-            "SELECT username, expires_on, enabled, is_admin, note, created_at "
+            "SELECT username, expires_on, enabled, is_admin, note, created_at, "
+            "free_quota, free_used, credits "
             "FROM users ORDER BY is_admin DESC, username").fetchall()
     today = datetime.date.today().isoformat()
     out = []
@@ -277,6 +278,8 @@ def list_users():
             "expires_on": r["expires_on"] or "無期限",
             "enabled": bool(r["enabled"]), "is_admin": bool(r["is_admin"]),
             "note": r["note"] or "",
+            "free_quota": r["free_quota"], "free_used": r["free_used"] or 0,
+            "credits": r["credits"] or 0,
             "状態": ("管理者" if r["is_admin"] else "停止中" if not r["enabled"]
                     else "期限切れ" if expired else "有効"),
         })
