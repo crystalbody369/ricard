@@ -818,6 +818,17 @@ def admin():
             escape(d["title"] + d["body"]), escape(d["title"]), escape(snip), d["created_at"], d["id"])
     drows = drows or "<tr><td colspan='3' class='note'>まだありません</td></tr>"
 
+    # 取り込みボタン（未取り込みがある時だけ出す。済みなら「取り込み済み」表示）
+    pending = store.seed_pending_count()
+    if pending > 0:
+        import_block = (
+            '<form method="post" style="margin:0 0 12px"><input type="hidden" name="action" value="ri_import">'
+            '<button type="submit" class="ghost">同梱の理データ（未取り込み %d件）を取り込む</button>'
+            '<span class="note">　※あなたの記録・著作から作った理。重複は自動で飛ばします。</span></form>' % pending)
+    else:
+        import_block = ('<div class="ok" style="margin:0 0 12px">✓ 同梱の理データ（%d件）は取り込み済みです。'
+                        '新しい理を私が足したときだけ、ここに取り込みボタンが出ます。</div>' % store.seed_count())
+
     body = """<h1>管理者画面</h1><p class="tag">理カード・オーナー専用（{user}）</p>
 {msg}
 <div class="card"><div class="top"><h2>今日の利用額</h2><a class="btn ghost mini" href="/">アプリへ</a></div>
@@ -846,9 +857,7 @@ def admin():
 
 <div class="card"><h2>理の知識ベース（{dcount}件・検索して使う）</h2>
 <p class="note">講話・事例・原則を1件ずつ追加。相談ごとにAIが<b>関係するものだけ自動で探して</b>使います。何件でも貯められます（大量OK）。※名前・団体名は書かないでください。</p>
-<form method="post" style="margin:0 0 12px"><input type="hidden" name="action" value="ri_import">
-<button type="submit" class="ghost">同梱の理データ（{seedn}件）をまとめて取り込む</button>
-<span class="note">　※あなたの記録・著作から作った理。重複は自動で飛ばします。</span></form>
+{import_block}
 <input type="text" id="kbsearch" oninput="filterKB()" placeholder="理を検索（お金 / 縁 / 焦り / 言葉 など）">
 <div class="note" style="margin:4px 2px">表示中 <span id="kbcount">{dcount}</span> 件</div>
 <div class="note" style="margin:2px">枠内にマウスを合わせる（またはクリック）と、↑↓キー・PageUp/Down でも動きます。</div>
@@ -864,7 +873,7 @@ def admin():
         user=escape(me["username"]), msg=mb, spent=int(spent),
         crows=crows or "<tr><td colspan='5' class='note'>まだありません</td></tr>",
         urows=urows, ri_extra=ri_extra, dcount=dcount, drows=drows,
-        seedn=store.seed_count())
+        import_block=import_block)
     return _shell("管理者", body)
 
 

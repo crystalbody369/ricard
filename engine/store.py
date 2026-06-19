@@ -110,6 +110,23 @@ def seed_count():
         return 0
 
 
+def seed_pending_count():
+    """同梱データのうち、まだ知識ベースに入っていない件数。0なら取り込み済み。"""
+    p = _seed_path()
+    if not os.path.exists(p):
+        return 0
+    try:
+        with open(p, encoding="utf-8") as f:
+            entries = json.load(f)
+    except (ValueError, OSError):
+        return 0
+    _ensure_ri_docs()
+    with get_conn() as conn:
+        existing = set(r["title"] for r in conn.execute("SELECT title FROM ri_docs").fetchall())
+    return sum(1 for e in entries
+               if (e.get("title") or "").strip() and (e.get("title") or "").strip() not in existing)
+
+
 def import_ri_seed():
     """同梱の ri_seed.json から、まだ無いタイトルの理を知識ベースへ取り込む。追加件数を返す。"""
     _ensure_ri_docs()
