@@ -7,11 +7,64 @@
 
 import os
 import sqlite3
+import json
 import datetime
 import threading
+from contextlib import contextmanager
 
 _lock = threading.Lock()
 _conn = None
+
+
+@contextmanager
+def get_conn():
+    """認証・管理用の接続（row_factory付き・コミット＆クローズ）。auth.py から使う。"""
+    path = _db_path()
+    d = os.path.dirname(path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=5000")
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _ensure_settings():
+    with get_conn() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+
+
+def set_setting(key, value):
+    _ensure_settings()
+    with get_conn() as conn:
+        conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES(?, ?)",
+                     (key, json.dumps(value)))
+
+
+def get_setting(key, default=None):
+    _ensure_settings()
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    if row is None:
+        return default
+    try:
+        return json.loads(row["value"])
+    except (ValueError, TypeError):
+        return default
+
+
+def get_or_create_setting(key, value):
+    """無ければ value を入れ、必ず確定値を返す（多重ワーカーでもズレない）。"""
+    _ensure_settings()
+    with get_conn() as conn:
+        conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)",
+                     (key, json.dumps(value)))
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return json.loads(row["value"])
 
 
 def _db_path():

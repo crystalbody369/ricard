@@ -7,7 +7,11 @@ Flask。カード画像はサーバー側でローカル生成して返す（外
   → http://127.0.0.1:5390/
 """
 import io
+import os
 import sys
+import secrets
+import datetime
+from functools import wraps
 from datetime import date
 
 try:
@@ -15,7 +19,9 @@ try:
 except Exception:
     pass
 
-from flask import Flask, request, send_file, abort, Response, jsonify
+from flask import (Flask, request, send_file, abort, Response, jsonify,
+                   session, redirect)
+from markupsafe import escape
 
 from engine.voice import build_card
 from engine.card_image import render, render_view
@@ -23,6 +29,7 @@ from engine.en import build_en
 from engine.flow import build_detail
 from engine.ri_consult import consult
 from engine import store
+from engine import auth
 
 CONSULT_MAX_CHARS = 500   # 入力の蓋（コスト上限を固定する）
 CONSULT_IP_DAILY = 10     # サーバー側の最終防衛：1IP/1日の相談回数（端末側3回とは別の網）
@@ -41,6 +48,53 @@ def _ip_bump(ip):
     store.bump("ip:" + ip)
 
 app = Flask(__name__)
+
+# 認証テーブル準備＋セッション鍵（DBに保存して再起動でも一定＝ログイン維持）
+auth.init_auth()
+
+
+def _secret_key():
+    env = os.environ.get("RICARD_SECRET_KEY", "").strip()
+    if env:
+        return env
+    return store.get_or_create_setting("secret_key", secrets.token_hex(32))
+
+
+app.secret_key = _secret_key()
+app.permanent_session_lifetime = datetime.timedelta(days=30)
+
+
+def _current_user():
+    """セッションのユーザーが今も有効か毎回確認（即停止・期限切れを効かせる）。"""
+    u = session.get("user")
+    if not u:
+        return None
+    st = auth.check_active(u)
+    if not st["ok"]:
+        session.clear()
+        return None
+    return {"username": u, "is_admin": st["is_admin"]}
+
+
+def login_required(f):
+    @wraps(f)
+    def wrap(*a, **kw):
+        if not _current_user():
+            if request.path.startswith("/api/"):
+                return jsonify({"ok": False, "text": "ログインが必要です。"}), 401
+            return redirect("/login")
+        return f(*a, **kw)
+    return wrap
+
+
+def admin_required(f):
+    @wraps(f)
+    def wrap(*a, **kw):
+        u = _current_user()
+        if not u or not u["is_admin"]:
+            return redirect("/login")
+        return f(*a, **kw)
+    return wrap
 
 
 def _parse(s):
@@ -372,6 +426,7 @@ function showDetail(){
 
 
 @app.route("/")
+@login_required
 def index():
     resp = Response(PAGE, mimetype="text/html")
     # 常に最新ページを配る（古いキャッシュで新機能が動かないのを防ぐ）
@@ -391,6 +446,7 @@ def _server_today():
 
 
 @app.route("/api/card")
+@login_required
 def api_card():
     b = request.args.get("b", "")
     d = request.args.get("d", "")   # 閲覧者の端末ローカル日付（その人の"今日"）
@@ -411,6 +467,7 @@ def api_card():
 
 
 @app.route("/api/en")
+@login_required
 def api_en():
     a = request.args.get("a", "")
     b = request.args.get("b", "")
@@ -425,6 +482,7 @@ def api_en():
 
 
 @app.route("/api/detail")
+@login_required
 def api_detail():
     b = request.args.get("b", "")
     d = request.args.get("d", "")
@@ -446,6 +504,7 @@ def api_detail():
 
 
 @app.route("/api/consult", methods=["POST"])
+@login_required
 def api_consult():
     data = request.get_json(silent=True) or {}
     event = (data.get("event") or "").strip()
@@ -464,6 +523,232 @@ def api_consult():
     if result.get("ok"):
         _ip_bump(ip)                         # 成功時のみカウント
     return jsonify(result)
+
+
+def _shell(title, body):
+    return Response("""<!doctype html><html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>""" + title + """・理カード</title><style>
+ :root{ --bg:#fbf6ec; --bg2:#f3e7d0; --ink:#3a322a; --sub:#8a7b63; --gold:#b08a4e; --line:#e4d8c2; }
+ *{box-sizing:border-box;} body{margin:0;background:linear-gradient(#fbf6ec,#f3e7d0);color:var(--ink);
+  font-family:"Yu Mincho","Hiragino Mincho ProN",serif;-webkit-font-smoothing:antialiased;}
+ .wrap{max-width:640px;margin:0 auto;padding:30px 20px 70px;}
+ h1{font-size:26px;font-weight:500;letter-spacing:.2em;text-align:center;margin:6px 0 4px;}
+ .tag{text-align:center;color:var(--sub);font-size:13px;margin:0 0 24px;}
+ .card{background:#fffdf8;border:1px solid var(--line);border-radius:14px;padding:20px 18px;margin:0 0 18px;}
+ h2{font-size:17px;font-weight:500;letter-spacing:.08em;margin:0 0 12px;}
+ label{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px;}
+ input[type=text],input[type=password],input[type=number],textarea{width:100%;padding:11px 13px;font-size:16px;
+  border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font-family:inherit;}
+ textarea{resize:vertical;line-height:1.7;}
+ button,.btn{display:inline-block;margin-top:14px;padding:11px 16px;font-size:15px;font-family:inherit;color:#fff;
+  background:var(--ink);border:none;border-radius:9px;letter-spacing:.06em;cursor:pointer;text-decoration:none;}
+ button.full{width:100%;}
+ .mini{padding:5px 10px;font-size:12px;margin:2px;}
+ .ghost{background:transparent;color:var(--ink);border:1px solid var(--ink);}
+ .err{background:#fbe9e7;border:1px solid #e0b4ab;color:#a04434;font-size:14px;border-radius:9px;padding:10px 12px;margin:0 0 14px;}
+ .ok{background:#eaf5e9;border:1px solid #b6d8b0;color:#3a7a34;font-size:14px;border-radius:9px;padding:10px 12px;margin:0 0 14px;}
+ .lnk{text-align:center;font-size:13px;margin-top:14px;}
+ a{color:var(--gold);}
+ table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0;}
+ th,td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;}
+ th{color:var(--sub);font-weight:500;}
+ .row{display:flex;gap:8px;flex-wrap:wrap;}
+ .note{font-size:12px;color:var(--sub);margin:6px 0;}
+ .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+</style></head><body><div class="wrap">""" + body + "</div></body></html>",
+                    mimetype="text/html")
+
+
+SETUP_BODY = """<h1>理カード</h1><p class="tag">最初の管理者を作成します</p>
+<div class="card"><h2>管理者アカウント作成</h2>{err}
+<form method="post">
+<label>ユーザー名</label><input type="text" name="username" autocomplete="username">
+<label>パスワード（6文字以上）</label><input type="password" name="password" autocomplete="new-password">
+<button class="full" type="submit">管理者を作成</button></form>
+<p class="note">この画面は最初の1回だけ表示されます。</p></div>"""
+
+LOGIN_BODY = """<h1>理カード</h1><p class="tag">今日を、当てずに整える。</p>
+<div class="card"><h2>ログイン</h2>{err}
+<form method="post">
+<label>ユーザー名</label><input type="text" name="username" autocomplete="username">
+<label>パスワード</label><input type="password" name="password" autocomplete="current-password">
+<button class="full" type="submit">ログイン</button></form>
+<p class="lnk">紹介コードをお持ちの方は <a href="/register">こちらで登録</a></p></div>"""
+
+REGISTER_BODY = """<h1>理カード</h1><p class="tag">紹介コードで登録</p>
+<div class="card"><h2>新規登録</h2>{err}
+<form method="post">
+<label>紹介コード</label><input type="text" name="code">
+<label>ユーザー名</label><input type="text" name="username" autocomplete="username">
+<label>パスワード（6文字以上）</label><input type="password" name="password" autocomplete="new-password">
+<button class="full" type="submit">登録して始める</button></form>
+<p class="lnk">すでに登録済みの方は <a href="/login">ログイン</a></p></div>"""
+
+
+@app.route("/setup", methods=["GET", "POST"])
+def setup():
+    if auth.count_users() > 0:
+        return redirect("/login")
+    err = ""
+    if request.method == "POST":
+        try:
+            auth.add_user(request.form.get("username", ""),
+                          request.form.get("password", ""), is_admin=True)
+            session.permanent = True
+            session["user"] = (request.form.get("username", "") or "").strip()
+            return redirect("/admin")
+        except Exception as e:
+            err = str(e)
+    eb = ('<div class="err">%s</div>' % escape(err)) if err else ""
+    return _shell("初期設定", SETUP_BODY.format(err=eb))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if auth.count_users() == 0:
+        return redirect("/setup")
+    err = ""
+    if request.method == "POST":
+        uname = (request.form.get("username", "") or "").strip()
+        r = auth.verify(uname, request.form.get("password", ""))
+        if r["ok"]:
+            session.permanent = True
+            session["user"] = uname
+            return redirect("/admin" if r["is_admin"] else "/")
+        err = r["reason"]
+    eb = ('<div class="err">%s</div>' % escape(err)) if err else ""
+    return _shell("ログイン", LOGIN_BODY.format(err=eb))
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    err = ""
+    if request.method == "POST":
+        try:
+            uname = (request.form.get("username", "") or "").strip()
+            auth.register_with_code(request.form.get("code", ""), uname,
+                                    request.form.get("password", ""))
+            session.permanent = True
+            session["user"] = uname
+            return redirect("/")
+        except Exception as e:
+            err = str(e)
+    eb = ('<div class="err">%s</div>' % escape(err)) if err else ""
+    return _shell("新規登録", REGISTER_BODY.format(err=eb))
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+@app.route("/admin", methods=["GET", "POST"])
+@admin_required
+def admin():
+    msg = ""
+    if request.method == "POST":
+        a = request.form.get("action", "")
+        try:
+            if a == "code_create":
+                auth.create_code(
+                    request.form.get("code", ""),
+                    max_uses=int(request.form.get("max_uses") or 0),
+                    grant_days=(int(request.form["grant_days"]) if request.form.get("grant_days") else None),
+                    note=request.form.get("note", ""))
+                msg = "紹介コードを作成しました。"
+            elif a == "code_toggle":
+                auth.set_code_enabled(request.form.get("code", ""),
+                                      request.form.get("to") == "on")
+                msg = "コードの状態を変更しました。"
+            elif a == "code_delete":
+                auth.delete_code(request.form.get("code", ""))
+                msg = "コードを削除しました。"
+            elif a == "user_toggle":
+                auth.set_enabled(request.form.get("username", ""),
+                                 request.form.get("to") == "on")
+                msg = "利用者の状態を変更しました。"
+            elif a == "user_extend":
+                auth.extend_days(request.form.get("username", ""), 30)
+                msg = "利用期限を30日延長しました。"
+            elif a == "user_delete":
+                auth.delete_user(request.form.get("username", ""))
+                msg = "利用者を削除しました。"
+            elif a == "ri_save":
+                store.set_setting("ri_extra", request.form.get("ri_extra", ""))
+                msg = "理の追記を保存しました。"
+        except Exception as e:
+            msg = "エラー: " + str(e)
+
+    # 紹介コード表
+    crows = ""
+    for c in auth.list_codes():
+        uses = ("%d / %s" % (c["used_count"], "∞" if not c["max_uses"] else c["max_uses"]))
+        gd = ("%d日" % c["grant_days"]) if c["grant_days"] is not None else "無期限"
+        to = "off" if c["enabled"] else "on"
+        crows += ("<tr><td><b>%s</b></td><td>%s</td><td>%s</td><td>付与%s</td>"
+                  "<td><form method='post' style='display:inline'><input type='hidden' name='action' value='code_toggle'>"
+                  "<input type='hidden' name='code' value='%s'><input type='hidden' name='to' value='%s'>"
+                  "<button class='mini ghost'>%s</button></form>"
+                  "<form method='post' style='display:inline' onsubmit=\"return confirm('削除しますか？')\">"
+                  "<input type='hidden' name='action' value='code_delete'><input type='hidden' name='code' value='%s'>"
+                  "<button class='mini ghost'>削除</button></form></td></tr>") % (
+            escape(c["code"]), escape(c["状態"]), uses, gd,
+            escape(c["code"]), to, ("停止" if c["enabled"] else "再開"), escape(c["code"]))
+
+    # 利用者表
+    urows = ""
+    for u in auth.list_users():
+        to = "off" if u["enabled"] else "on"
+        admin_tag = " 👑" if u["is_admin"] else ""
+        acts = ""
+        if not u["is_admin"]:
+            acts = ("<form method='post' style='display:inline'><input type='hidden' name='action' value='user_toggle'>"
+                    "<input type='hidden' name='username' value='%s'><input type='hidden' name='to' value='%s'>"
+                    "<button class='mini ghost'>%s</button></form>"
+                    "<form method='post' style='display:inline'><input type='hidden' name='action' value='user_extend'>"
+                    "<input type='hidden' name='username' value='%s'><button class='mini ghost'>+30日</button></form>"
+                    "<form method='post' style='display:inline' onsubmit=\"return confirm('削除しますか？')\">"
+                    "<input type='hidden' name='action' value='user_delete'><input type='hidden' name='username' value='%s'>"
+                    "<button class='mini ghost'>削除</button></form>") % (
+                escape(u["username"]), to, ("停止" if u["enabled"] else "再開"),
+                escape(u["username"]), escape(u["username"]))
+        urows += "<tr><td><b>%s</b>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+            escape(u["username"]), admin_tag, escape(u["状態"]), escape(str(u["expires_on"])), acts)
+
+    ri_extra = escape(store.get_setting("ri_extra", "") or "")
+    spent = store.spent_today()
+    me = _current_user()
+    mb = ('<div class="ok">%s</div>' % escape(msg)) if msg else ""
+
+    body = """<h1>管理者画面</h1><p class="tag">理カード・オーナー専用（{user}）</p>
+{msg}
+<div class="card"><div class="top"><h2>今日の利用額</h2><a class="btn ghost mini" href="/">アプリへ</a></div>
+<p class="note">本日のAI利用：約 ¥{spent} / 上限の蓋つき。<a href="/logout">ログアウト</a></p></div>
+
+<div class="card"><h2>紹介コード</h2>
+<table><tr><th>コード</th><th>状態</th><th>使用</th><th>付与期限</th><th></th></tr>{crows}</table>
+<form method="post" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+<input type="hidden" name="action" value="code_create">
+<label>新しいコード（例：RICARD2026）</label><input type="text" name="code">
+<div class="row"><div style="flex:1"><label>使用上限（0=無制限）</label><input type="number" name="max_uses" value="0"></div>
+<div style="flex:1"><label>付与する利用日数（空=無期限）</label><input type="number" name="grant_days" placeholder="空=無期限"></div></div>
+<label>メモ（任意）</label><input type="text" name="note">
+<button type="submit">コードを発行</button></form></div>
+
+<div class="card"><h2>利用者</h2>
+<table><tr><th>ユーザー</th><th>状態</th><th>期限</th><th></th></tr>{urows}</table></div>
+
+<div class="card"><h2>理の追記（あなただけの理）</h2>
+<p class="note">ここに書いた理を、AIが相談で大切にします。※名前・団体名は書かないでください（普遍的な原則のみ）。</p>
+<form method="post"><input type="hidden" name="action" value="ri_save">
+<textarea name="ri_extra" rows="10" placeholder="例：急いては事を仕損じる。焦りは好転の前ぶれのこともある…">{ri_extra}</textarea>
+<button type="submit">理を保存</button></form></div>""".format(
+        user=escape(me["username"]), msg=mb, spent=int(spent),
+        crows=crows or "<tr><td colspan='5' class='note'>まだありません</td></tr>",
+        urows=urows, ri_extra=ri_extra)
+    return _shell("管理者", body)
 
 
 if __name__ == "__main__":
