@@ -313,6 +313,13 @@ def change_password(username, password):
                      (_hash(password, salt), salt, username))
 
 
+def reset_password(username):
+    """管理者用：ランダムな仮パスワードを発行して設定し、その平文を返す（本人に伝える）。"""
+    newpw = secrets.token_urlsafe(6)
+    change_password(username, newpw)
+    return newpw
+
+
 def delete_user(username):
     with store.get_conn() as conn:
         conn.execute("DELETE FROM users WHERE username=?", (username,))

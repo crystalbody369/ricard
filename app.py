@@ -857,6 +857,10 @@ def admin():
             elif a == "user_grant":
                 auth.add_credits(request.form.get("username", ""), PACK_CREDITS)
                 msg = "%d回ぶんのクレジットを付与しました。" % PACK_CREDITS
+            elif a == "user_resetpw":
+                uname = request.form.get("username", "")
+                np = auth.reset_password(uname)
+                msg = "%s さんのパスワードを再設定しました。新しい仮パスワード：%s （本人に伝えてください）" % (uname, np)
             elif a == "user_delete":
                 auth.delete_user(request.form.get("username", ""))
                 msg = "利用者を削除しました。"
@@ -914,12 +918,15 @@ def admin():
                     "<input type='hidden' name='username' value='%s'><button class='mini ghost'>+%d回</button></form>"
                     "<form method='post' style='display:inline'><input type='hidden' name='action' value='user_extend'>"
                     "<input type='hidden' name='username' value='%s'><button class='mini ghost'>+30日</button></form>"
+                    "<form method='post' style='display:inline' onsubmit=\"return confirm('パスワードを再設定しますか？')\">"
+                    "<input type='hidden' name='action' value='user_resetpw'><input type='hidden' name='username' value='%s'>"
+                    "<button class='mini ghost'>PW再設定</button></form>"
                     "<form method='post' style='display:inline' onsubmit=\"return confirm('削除しますか？')\">"
                     "<input type='hidden' name='action' value='user_delete'><input type='hidden' name='username' value='%s'>"
                     "<button class='mini ghost'>削除</button></form>") % (
                 escape(u["username"]), to, ("停止" if u["enabled"] else "再開"),
                 escape(u["username"]), PACK_CREDITS,
-                escape(u["username"]), escape(u["username"]))
+                escape(u["username"]), escape(u["username"]), escape(u["username"]))
         urows += "<tr><td><b>%s</b>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
             escape(u["username"]), admin_tag, escape(u["状態"]), escape(str(u["expires_on"])),
             escape(bal_txt), acts)
