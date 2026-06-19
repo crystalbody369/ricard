@@ -103,9 +103,7 @@ PAGE = """<!doctype html>
 
   <div class="card">
     <h2>二人の縁</h2>
-    <label>あなたの生年月日</label>
-    <input type="date" id="enA" min="1900-01-01" max="2025-12-31">
-    <label>お相手の生年月日</label>
+    <label>お相手の生年月日（あなたの分は「今日の理」の設定から）</label>
     <input type="date" id="enB" min="1900-01-01" max="2025-12-31">
     <button onclick="showEn()">二人の縁を見る</button>
     <button class="ghost" onclick="copyInvite()">この縁を相手に送る</button>
@@ -152,15 +150,15 @@ function showCard(){
     img.style.display = 'block';
     qs('cardBtns').classList.remove('hidden');
     qs('detailBtn').classList.remove('hidden');
-    if(!qs('enA').value) qs('enA').value = b;
   }catch(err){
     alert('エラー: ' + (err && err.message ? err.message : err));
   }
 }
 
 function showEn(){
-  var a = qs('enA').value, b = qs('enB').value;
-  if(!a || !b){ alert('二人の生年月日を選んでください'); return; }
+  var a = qs('me').value, b = qs('enB').value;
+  if(!a){ alert('先に「設定」であなたの生年月日を入れてください'); toggleSettings(); return; }
+  if(!b){ alert('お相手の生年月日を選んでください'); return; }
   var img = qs('enImg');
   img.style.opacity = '0.35';
   img.onload = function(){ img.style.opacity='1'; img.scrollIntoView({behavior:'smooth', block:'center'}); };
@@ -189,8 +187,8 @@ async function shareImg(id, name){
 }
 
 function copyInvite(){
-  var a = qs('enA').value || qs('me').value;
-  if(!a){ alert('まずあなたの生年月日を選んでください'); return; }
+  var a = qs('me').value;
+  if(!a){ alert('先に「設定」であなたの生年月日を入れてください'); toggleSettings(); return; }
   var link = location.origin + '/?en=' + a;
   // スマホ：OSの共有メニュー（LINE・メール等）を開く
   if(navigator.share){
@@ -242,12 +240,9 @@ function showDetail(){
   }catch(e){}
   var en = p.get('en');
   if(en){
-    qs('enA').value = en;
-    qs('banner').textContent = 'あなたとの「縁」を見たい人がいます。あなたの生年月日を入れてください。';
+    qs('enB').value = en;
+    qs('banner').textContent = 'あなたとの「縁」を見たい人からの招待です。あなたの生年月日は「設定」から入れてください。';
     qs('banner').style.display = 'block';
-    qs('enB').focus();
-  } else if(qs('me').value && !qs('enA').value){
-    qs('enA').value = qs('me').value;
   }
 })();
 </script>
