@@ -642,14 +642,17 @@ def stripe_webhook():
             event = json.loads(payload.decode("utf-8"))
     except Exception:
         return ("bad signature", 400)
-    if event.get("type") == "checkout.session.completed":
-        obj = event["data"]["object"]
-        meta = obj.get("metadata") or {}
-        uname = meta.get("username")
+    try:
+        etype = event["type"]                       # StripeObjectも辞書もインデックスでOK
+    except Exception:
+        etype = None
+    if etype == "checkout.session.completed":
         try:
-            n = int(meta.get("credits") or 0)
-        except (TypeError, ValueError):
-            n = 0
+            meta = event["data"]["object"]["metadata"] or {}
+            uname = meta["username"]
+            n = int(meta["credits"])
+        except Exception:
+            uname, n = None, 0
         if uname and n > 0:
             auth.add_credits(uname, n)
     return ("", 200)
