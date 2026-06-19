@@ -12,6 +12,8 @@
 これらの組合せで、生年月日ごとに実質的に異なる読みになる。
 当てる・断定する、はしない。すべてローカル計算・外部送信なし。"""
 
+from lunar_python import Solar
+
 from .chart import birth_chart, day_info
 from .tables import (
     GAN_ELEMENT, ZHI_ELEMENT, ELEMENTS, SHENG, KE,
@@ -183,7 +185,41 @@ def build_direction(date, honmei_num):
     return {"ki_dir": di["day_direction"], "avoid": avoid}
 
 
-def build_detail(birth, date):
+def build_liunian(date, day_master):
+    """流年＝その年の干支と、日主から見た十神（今年の運の背景）。"""
+    s = Solar.fromYmdHms(int(date[0]), int(date[1]), int(date[2]), 12, 0, 0)
+    ec = s.getLunar().getEightChar()
+    gz = ec.getYear()
+    tg = ten_god(day_master, gz[0])
+    return gz, tg, TEN_GOD_GROUP[tg]
+
+
+def build_yojin(dm_elem, strength):
+    """用神（簡易・扶抑）。身弱なら支える五行、身強なら出す五行。"""
+    gen_me = next(k for k, v in SHENG.items() if v == dm_elem)   # 日主を生む五行（印）
+    if strength == "weak":
+        return [gen_me, dm_elem]                 # 身弱 → 印・比で支える
+    return [SHENG[dm_elem], KE[dm_elem]]         # 身強 → 食傷・財で出す
+
+
+def current_dayun(birth, gender_code, target_year, day_master):
+    """今の大運（10年の運）。gender_code: 0=男, 1=女（lunar_python準拠）。"""
+    h = birth[3] if len(birth) > 3 else 12
+    s = Solar.fromYmdHms(int(birth[0]), int(birth[1]), int(birth[2]), int(h), 0, 0)
+    ec = s.getLunar().getEightChar()
+    yun = ec.getYun(gender_code)
+    for d in yun.getDaYun():
+        if d.getStartYear() <= target_year <= d.getEndYear():
+            gz = d.getGanZhi()
+            if not gz:                            # 起運前（幼年期）は干支なし
+                return {"ganzhi": None, "age": (d.getStartAge(), d.getEndAge())}
+            tg = ten_god(day_master, gz[0])
+            return {"ganzhi": gz, "ten_god": tg, "group": TEN_GOD_GROUP[tg],
+                    "age": (d.getStartAge(), d.getEndAge())}
+    return None
+
+
+def build_detail(birth, date, gender=None):
     """このカードが『何をもとに出ているか』を分かりやすく返す（誠実さの開示用）。"""
     m = build_flow(birth, date)
     bc = birth_chart(*birth)
@@ -209,6 +245,19 @@ def build_detail(birth, date):
         grouped[d].append(lbl)
     avoid_str = "・".join("%s（%s）" % (d, "・".join(grouped[d])) for d in order) or "特になし"
     rows.append(["今日 控えめにしたい向き（参考）", avoid_str])
+    # 流年（今年の運）
+    ly_gz, _ly_tg, ly_grp = build_liunian(date, dm)
+    rows.append(["今年の運（流年）", "%s（%s）" % (ly_gz, _GROUP_GLOSS[ly_grp])])
+    # 用神（合う五行・簡易）
+    yojin = build_yojin(dm_elem, m["strength"])
+    rows.append(["あなたに合う五行（用神・簡易）", "・".join(yojin)])
+    # 大運（10年の流れ）※性別が必要
+    if gender in ("m", "f"):
+        du = current_dayun(birth, 0 if gender == "m" else 1, int(date[0]), dm)
+        if du and du.get("ganzhi"):
+            rows.append(["今の大運（10年の流れ）",
+                         "%d〜%d歳：%s（%s）" % (du["age"][0], du["age"][1],
+                                               du["ganzhi"], _GROUP_GLOSS[du["group"]])])
     how = ("生年月日から四柱推命の命式（あなたの軸＝日主）を出し、"
            "今日の干支との関係＝十神「%s」で今日のテーマを、"
            "あなたの体質（身強・身弱）との相性で『追い風か控えめか』を、"
@@ -216,7 +265,9 @@ def build_detail(birth, date):
            "方位は、その日の九星の配置から、五黄殺・暗剣殺・日破と、"
            "あなたの本命星の位置（本命殺）から『避けたい向き』を出しています。"
            "良い向き（吉方）は流派で見方が分かれるため、定義の明確な避けたい向きだけを参考としています。"
-           "挙げた向き以外は、特に気にしすぎなくて大丈夫です。" % m["ten_god"])
+           "挙げた向き以外は、特に気にしすぎなくて大丈夫です。"
+           "さらに、今年の干支（流年）・あなたに合う五行（用神）・"
+           "（性別を入れると）今の10年期（大運）も併せて見ています。" % m["ten_god"])
     return {
         "methods": "四柱推命（生年月日からの命式）＋ 九星気学（方位）＋ 一神会『理』の考え方",
         "rows": rows,

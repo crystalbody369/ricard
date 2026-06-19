@@ -67,6 +67,10 @@ PAGE = """<!doctype html>
   .detail td.k{ color:var(--sub); width:46%; }
   .detail .how{ margin-top:8px; }
   .detail .note{ color:var(--sub); font-size:12px; margin-top:8px; }
+  .settings{ background:#fffaf0; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:6px; }
+  select{ width:100%; padding:12px 14px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; }
+  .card h2{ display:flex; align-items:center; }
+  .gear{ width:auto; margin-left:auto; padding:5px 12px; font-size:13px; background:transparent; color:var(--sub); border:1px solid var(--line); letter-spacing:0; }
 </style>
 </head><body>
 <div class="wrap">
@@ -76,12 +80,16 @@ PAGE = """<!doctype html>
   <div class="banner" id="banner"></div>
 
   <div class="card">
-    <h2>今日の理</h2>
-    <label>あなたの生年月日</label>
-    <input type="date" id="me" min="1900-01-01" max="2025-12-31">
-    <label>生まれた時間（わかれば・任意）</label>
-    <input type="time" id="metime">
-    <button onclick="showCard()">今日の理を見る</button>
+    <h2>今日の理<button class="gear" onclick="toggleSettings()">⚙ 設定</button></h2>
+    <div id="settings" class="settings">
+      <label>あなたの生年月日</label>
+      <input type="date" id="me" min="1900-01-01" max="2025-12-31">
+      <label>生まれた時間（わかれば・任意）</label>
+      <input type="time" id="metime">
+      <label>性別（大運の計算に使用・任意）</label>
+      <select id="gender"><option value="">選ばない</option><option value="m">男性</option><option value="f">女性</option></select>
+      <button onclick="saveAndShow()">保存して今日の理を見る</button>
+    </div>
     <div class="result">
       <img id="cardImg" alt="今日の理カード">
       <div class="row hidden" id="cardBtns">
@@ -120,12 +128,14 @@ function localToday(){
   var d = new Date();
   return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
 }
+function toggleSettings(){ var s=qs('settings'); s.style.display=(s.style.display==='none')?'block':'none'; }
+function saveAndShow(){ showCard(); qs('settings').style.display='none'; }
 function showCard(){
   try{
     var b = qs('me').value;
     if(!b){ alert('生年月日を選んでください'); qs('me').focus(); return; }
     var t = qs('metime').value;  // "HH:MM" または ""
-    try{ localStorage.setItem('ricard_birth', b); localStorage.setItem('ricard_time', t); }catch(e){}
+    try{ localStorage.setItem('ricard_birth', b); localStorage.setItem('ricard_time', t); localStorage.setItem('ricard_gender', qs('gender').value); }catch(e){}
     var url = '/api/card?b=' + b + '&d=' + localToday();
     if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
     var img = qs('cardImg');
@@ -207,9 +217,10 @@ function showDetail(){
   var b = qs('me').value; if(!b){ alert('先に生年月日を入れてください'); return; }
   var el = qs('detail');
   if(el.style.display === 'block'){ el.style.display='none'; return; }
-  var t = qs('metime').value;
+  var t = qs('metime').value, g = qs('gender').value;
   var url = '/api/detail?b=' + b + '&d=' + localToday();
   if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
+  if(g){ url += '&g=' + g; }
   fetch(url).then(function(r){ return r.json(); }).then(function(j){
     el.innerHTML = renderDetail(j);
     el.style.display = 'block';
@@ -224,8 +235,10 @@ function showDetail(){
   try{
     var saved = localStorage.getItem('ricard_birth');
     var savedT = localStorage.getItem('ricard_time');
+    var savedG = localStorage.getItem('ricard_gender');
     if(savedT){ qs('metime').value = savedT; }
-    if(saved){ qs('me').value = saved; showCard(); }
+    if(savedG){ qs('gender').value = savedG; }
+    if(saved){ qs('me').value = saved; qs('settings').style.display='none'; showCard(); }
   }catch(e){}
   var en = p.get('en');
   if(en){
@@ -295,6 +308,7 @@ def api_detail():
     b = request.args.get("b", "")
     d = request.args.get("d", "")
     h = request.args.get("h", "")
+    g = request.args.get("g", "")
     try:
         birth = _parse(b)
         if h != "":
@@ -305,7 +319,7 @@ def api_detail():
         target = _parse(d) if d else _server_today()
     except Exception:
         target = _server_today()
-    return jsonify(build_detail(birth, target))
+    return jsonify(build_detail(birth, target, g if g in ("m", "f") else None))
 
 
 if __name__ == "__main__":
