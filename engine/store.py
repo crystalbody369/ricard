@@ -57,6 +57,30 @@ def get_setting(key, default=None):
         return default
 
 
+def _ensure_profiles():
+    with get_conn() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS profiles ("
+                     "username TEXT PRIMARY KEY, birth TEXT, hour TEXT, gender TEXT)")
+
+
+def get_profile(username):
+    """そのユーザーが保存した生年月日（アカウント紐づけ）。無ければ空。"""
+    _ensure_profiles()
+    with get_conn() as conn:
+        r = conn.execute("SELECT birth, hour, gender FROM profiles WHERE username=?",
+                         (username,)).fetchone()
+    if not r:
+        return {"birth": "", "hour": "", "gender": ""}
+    return {"birth": r["birth"] or "", "hour": r["hour"] or "", "gender": r["gender"] or ""}
+
+
+def save_profile(username, birth, hour, gender):
+    _ensure_profiles()
+    with get_conn() as conn:
+        conn.execute("INSERT OR REPLACE INTO profiles(username, birth, hour, gender) "
+                     "VALUES(?, ?, ?, ?)", (username, birth, hour, gender))
+
+
 def get_or_create_setting(key, value):
     """無ければ value を入れ、必ず確定値を返す（多重ワーカーでもズレない）。"""
     _ensure_settings()

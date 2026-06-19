@@ -265,13 +265,20 @@ function localToday(){
   return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
 }
 function toggleSettings(){ var s=qs('settings'); s.style.display=(s.style.display==='none')?'block':'none'; }
-function saveAndShow(){ showCard(); qs('settings').style.display='none'; }
+function saveProfile(){
+  // 生年月日はアカウント（サーバー）に保存。ログインで自動復元される。
+  try{ fetch('/api/profile', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({birth: qs('me').value, hour: qs('metime').value, gender: qs('gender').value})}); }catch(e){}
+}
+function saveAndShow(){
+  if(!qs('me').value){ alert('生年月日を選んでください'); qs('me').focus(); return; }
+  saveProfile(); showCard(); qs('settings').style.display='none';
+}
 function showCard(){
   try{
     var b = qs('me').value;
     if(!b){ alert('生年月日を選んでください'); qs('me').focus(); return; }
     var t = qs('metime').value;  // "HH:MM" または ""
-    try{ localStorage.setItem('ricard_birth', b); localStorage.setItem('ricard_time', t); localStorage.setItem('ricard_gender', qs('gender').value); }catch(e){}
     var url = '/api/card?b=' + b + '&d=' + localToday() + '&lang=' + LANG;
     if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
     var img = qs('cardImg');
@@ -408,21 +415,24 @@ function showDetail(){
 (function(){
   applyI18n();
   var p = new URLSearchParams(location.search);
-  // 前回入れた生年月日を復元（端末内に保存・サーバーには送らない）
-  try{
-    var saved = localStorage.getItem('ricard_birth');
-    var savedT = localStorage.getItem('ricard_time');
-    var savedG = localStorage.getItem('ricard_gender');
-    if(savedT){ qs('metime').value = savedT; }
-    if(savedG){ qs('gender').value = savedG; }
-    if(saved){ qs('me').value = saved; qs('settings').style.display='none'; showCard(); }
-  }catch(e){}
   var en = p.get('en');
   if(en){
     qs('enB').value = en;
     qs('banner').textContent = 'あなたとの「縁」を見たい人からの招待です。あなたの生年月日は「設定」から入れてください。';
     qs('banner').style.display = 'block';
   }
+  // 生年月日はアカウントから復元（新規登録者はまっさら）
+  fetch('/api/profile').then(function(r){ return r.json(); }).then(function(j){
+    if(j && j.birth){
+      qs('me').value = j.birth;
+      if(j.hour){ qs('metime').value = j.hour; }
+      if(j.gender){ qs('gender').value = j.gender; }
+      qs('settings').style.display = 'none';
+      showCard();
+    } else {
+      qs('settings').style.display = 'block';   // 新規＝まっさら、設定を開いて入力を促す
+    }
+  }).catch(function(){ qs('settings').style.display = 'block'; });
 })();
 </script>
 </body></html>"""
@@ -507,6 +517,18 @@ def api_detail():
     except Exception:
         target = _server_today()
     return jsonify(build_detail(birth, target, g if g in ("m", "f") else None, lang))
+
+
+@app.route("/api/profile", methods=["GET", "POST"])
+@login_required
+def api_profile():
+    u = _current_user()
+    if request.method == "POST":
+        d = request.get_json(silent=True) or {}
+        store.save_profile(u["username"], (d.get("birth") or "").strip(),
+                           (d.get("hour") or "").strip(), (d.get("gender") or "").strip())
+        return jsonify({"ok": True})
+    return jsonify(store.get_profile(u["username"]))
 
 
 @app.route("/api/consult", methods=["POST"])
