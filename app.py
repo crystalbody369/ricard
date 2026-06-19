@@ -22,12 +22,10 @@ from engine.card_image import render, render_view
 from engine.en import build_en
 from engine.flow import build_detail
 from engine.ri_consult import consult
+from engine import store
 
 CONSULT_MAX_CHARS = 500   # 入力の蓋（コスト上限を固定する）
 CONSULT_IP_DAILY = 10     # サーバー側の最終防衛：1IP/1日の相談回数（端末側3回とは別の網）
-
-import datetime as _dt
-_ip_hits = {}             # ip -> {"date": iso, "n": int}（best-effort・プロセス内）
 
 
 def _client_ip():
@@ -36,21 +34,11 @@ def _client_ip():
 
 
 def _ip_over_limit(ip):
-    today = _dt.date.today().isoformat()
-    rec = _ip_hits.get(ip)
-    if not rec or rec["date"] != today:
-        _ip_hits[ip] = {"date": today, "n": 0}
-        rec = _ip_hits[ip]
-    return rec["n"] >= CONSULT_IP_DAILY
+    return store.count_today("ip:" + ip) >= CONSULT_IP_DAILY   # 永続カウント
 
 
 def _ip_bump(ip):
-    today = _dt.date.today().isoformat()
-    rec = _ip_hits.get(ip)
-    if not rec or rec["date"] != today:
-        _ip_hits[ip] = {"date": today, "n": 1}
-    else:
-        rec["n"] += 1
+    store.bump("ip:" + ip)
 
 app = Flask(__name__)
 

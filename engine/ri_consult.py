@@ -18,7 +18,8 @@
 """
 
 import os
-import datetime
+
+from . import store
 
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 600
@@ -29,31 +30,12 @@ PRICE_OUT_USD = 15.0 / 1_000_000   # 出力 1 トークンあたり USD
 USD_JPY = 150.0
 DEFAULT_DAILY_BUDGET_JPY = 500.0   # 既定の1日総額上限（環境変数で変更可）
 
-# プロセス内の当日累計（best-effort）
-_spend = {"date": None, "jpy": 0.0}
-
-
-def _today():
-    return datetime.date.today().isoformat()
-
 
 def _daily_budget_jpy():
     try:
         return float(os.environ.get("RICARD_DAILY_BUDGET_JPY", DEFAULT_DAILY_BUDGET_JPY))
     except (TypeError, ValueError):
         return DEFAULT_DAILY_BUDGET_JPY
-
-
-def _spent_today():
-    if _spend["date"] != _today():      # 日付が変わったらリセット
-        _spend["date"] = _today()
-        _spend["jpy"] = 0.0
-    return _spend["jpy"]
-
-
-def _add_spend(jpy):
-    _spent_today()                      # 念のためロールオーバー確認
-    _spend["jpy"] += jpy
 
 
 def _usage_to_jpy(usage):
@@ -149,7 +131,7 @@ def consult(event, lang="ja"):
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         return {"text": _NO_KEY[lang], "ok": False}
-    if _spent_today() >= _daily_budget_jpy():          # 最終防衛：1日の総額上限
+    if store.spent_today() >= _daily_budget_jpy():     # 最終防衛：1日の総額上限（永続）
         return {"text": _OVER[lang], "ok": False, "over_budget": True}
     try:
         import anthropic
@@ -167,7 +149,7 @@ def consult(event, lang="ja"):
                 "content": _ASK[lang].format(event=event),
             }],
         )
-        _add_spend(_usage_to_jpy(getattr(msg, "usage", None)))  # 実使用量で当日累計に加算
+        store.add_spend(_usage_to_jpy(getattr(msg, "usage", None)))  # 実使用量で当日累計に加算（永続）
         parts = [b.text for b in msg.content if getattr(b, "type", "") == "text"]
         text = "\n".join(parts).strip()
         if not text:
