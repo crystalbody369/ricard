@@ -130,7 +130,7 @@ def render_view(view, style_name="morning"):
     y += 70
 
     # 一言（フック）
-    y = _center_block(draw, y, view["opening"], f_open, st["text"], CONTENT_W, 1.3)
+    y = _center_block(draw, y, view["opening"].rstrip("。"), f_open, st["text"], CONTENT_W, 1.3)
     y += 56
 
     # セクション（ビューから）

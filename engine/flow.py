@@ -133,6 +133,55 @@ _BREL_LABEL = {
     "friction": "刑・害（小さな摩擦）", "calm": "穏やか",
 }
 
+# ── 方位（九星気学）。その日の九星の配置から「避けたい向き」を割り出す ──
+_DIR_OPPOSITE = {"北": "南", "南": "北", "東": "西", "西": "東",
+                 "北東": "南西", "南西": "北東", "南東": "北西", "北西": "南東"}
+_HOME_DIR_BY_NUM = {1: "北", 2: "南西", 3: "東", 4: "南東", 5: "中央",
+                    6: "北西", 7: "西", 8: "北東", 9: "南"}
+# 十二支 → おおまかな方位（破の算出用）
+_ZHI_DIR = {"子": "北", "丑": "北東", "寅": "北東", "卯": "東", "辰": "南東", "巳": "南東",
+            "午": "南", "未": "南西", "申": "南西", "酉": "西", "戌": "北西", "亥": "北西"}
+
+
+def _day_board(day_star_num):
+    """その日の九星盤。各方位に入る星を返す（中宮＝その日の九星）。"""
+    D = day_star_num
+    board = {}
+    for P in range(1, 10):
+        star = ((P - 1 + (D - 5)) % 9) + 1
+        board[_HOME_DIR_BY_NUM[P]] = star
+    return board
+
+
+def _dir_of_star(board, star):
+    for dname, s in board.items():
+        if s == star and dname != "中央":
+            return dname
+    return None  # 中央にある場合（その日は該当なし）
+
+
+def build_direction(date, honmei_num):
+    """その日の「避けたい向き（参考）」を九星の配置から割り出す。"""
+    di = day_info(*date)
+    board = _day_board(di["day_star_num"])
+    avoid = []  # (方位, 名称)
+    gohou = _dir_of_star(board, 5)             # 五黄殺＝五黄土星のある方位
+    if gohou:
+        avoid.append((gohou, "五黄殺"))
+        anken = _DIR_OPPOSITE.get(gohou)       # 暗剣殺＝五黄の反対
+        if anken:
+            avoid.append((anken, "暗剣殺"))
+    nippa = _DIR_OPPOSITE.get(_ZHI_DIR.get(di["day_zhi"]))  # 日破＝その日の十二支の反対
+    if nippa:
+        avoid.append((nippa, "日破"))
+    honmei_dir = _dir_of_star(board, honmei_num)   # 本命殺＝自分の本命星のある方位
+    if honmei_dir:
+        avoid.append((honmei_dir, "本命殺"))
+        teki = _DIR_OPPOSITE.get(honmei_dir)       # 本命的殺＝その反対
+        if teki:
+            avoid.append((teki, "本命的殺"))
+    return {"ki_dir": di["day_direction"], "avoid": avoid}
+
 
 def build_detail(birth, date):
     """このカードが『何をもとに出ているか』を分かりやすく返す（誠実さの開示用）。"""
@@ -150,12 +199,23 @@ def build_detail(birth, date):
         ["今日の十神", "%s（%s）" % (m["ten_god"], _GROUP_GLOSS[m["group"]])],
         ["今日との相性", favor_jp],
         ["人との関係（地支）", _BREL_LABEL[m["branch_rel"]]],
-        ["気の向く方位（九星）", m["direction"]],
     ]
+    dinfo = build_direction(date, bc["honmei_star_num"])
+    grouped, order = {}, []
+    for d, lbl in dinfo["avoid"]:
+        if d not in grouped:
+            grouped[d] = []
+            order.append(d)
+        grouped[d].append(lbl)
+    avoid_str = "・".join("%s（%s）" % (d, "・".join(grouped[d])) for d in order) or "特になし"
+    rows.append(["今日の気の向く向き（参考）", dinfo["ki_dir"]])
+    rows.append(["控えめにしたい向き（参考）", avoid_str])
     how = ("生年月日から四柱推命の命式（あなたの軸＝日主）を出し、"
            "今日の干支との関係＝十神「%s」で今日のテーマを、"
            "あなたの体質（身強・身弱）との相性で『追い風か控えめか』を、"
-           "今日とあなたの地支の関係で人との動きを、九星で方位を読んでいます。" % m["ten_god"])
+           "今日とあなたの地支の関係で人との動きを読みます。"
+           "方位は、その日の九星の配置から、五黄殺・暗剣殺・日破（その日に避けたい向き）と、"
+           "あなたの本命星の位置（本命殺）を割り出しています。" % m["ten_god"])
     return {
         "methods": "四柱推命（生年月日からの命式）＋ 九星気学（方位）＋ 一神会『理』の考え方",
         "rows": rows,
