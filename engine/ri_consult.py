@@ -131,8 +131,24 @@ _OVER = {
 }
 
 
-def consult(event, lang="ja"):
+_KB_HEAD = {
+    "ja": "次の出来事を観るとき、関係しそうな『理』をいくつか挙げます（参考。当てはまらなければ無理に使わない）：",
+    "zh": "觀照以下事情時，提供幾條可能相關的『理』供參考（若不貼切，不必勉強使用）：",
+}
+
+
+def _with_kb(ask, kb_docs, lang):
+    """検索で選ばれた理を、相談文の前に参考として付ける（質問ごとに変わる＝ユーザー側に置く）。"""
+    if not kb_docs:
+        return ask
+    head = _KB_HEAD.get(lang, _KB_HEAD["ja"])
+    lines = "\n".join("・%s：%s" % (d.get("title", ""), d.get("body", "")) for d in kb_docs)
+    return head + "\n" + lines + "\n\n" + ask
+
+
+def consult(event, lang="ja", kb_docs=None):
     """出来事の文字列を理の視点で観た短い文を返す。
+    kb_docs: 知識ベースから検索された関係する理（[{title, body}]）。
     戻り値: {"text": str, "ok": bool, ...}"""
     if lang not in _CORPUS:
         lang = "ja"
@@ -158,7 +174,7 @@ def consult(event, lang="ja"):
             }],
             messages=[{
                 "role": "user",
-                "content": _ASK[lang].format(event=event),
+                "content": _with_kb(_ASK[lang].format(event=event), kb_docs, lang),
             }],
         )
         store.add_spend(_usage_to_jpy(getattr(msg, "usage", None)))  # 実使用量で当日累計に加算（永続）

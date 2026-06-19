@@ -547,7 +547,8 @@ def api_consult():
         msg = "今日のご利用が多いため、いったんお休みです。また明日どうぞ。" if lang == "ja" \
               else "今天使用量較多，先暫歇，明天再來。"
         return jsonify({"ok": False, "text": msg}), 429
-    result = consult(event, lang)
+    kb = store.search_ri_docs(event)         # 関係する理だけを検索（DB全部は読まない）
+    result = consult(event, lang, kb_docs=kb)
     if result.get("ok"):
         _ip_bump(ip)                         # 成功時のみカウント
     return jsonify(result)
@@ -720,6 +721,13 @@ def admin():
             elif a == "ri_save":
                 store.set_setting("ri_extra", request.form.get("ri_extra", ""))
                 msg = "理の追記を保存しました。"
+            elif a == "ridoc_add":
+                store.add_ri_doc(request.form.get("doc_title", ""),
+                                 request.form.get("doc_body", ""))
+                msg = "理を知識ベースに追加しました。"
+            elif a == "ridoc_delete":
+                store.delete_ri_doc(request.form.get("doc_id", ""))
+                msg = "理を知識ベースから削除しました。"
         except Exception as e:
             msg = "エラー: " + str(e)
 
@@ -764,6 +772,19 @@ def admin():
     me = _current_user()
     mb = ('<div class="ok">%s</div>' % escape(msg)) if msg else ""
 
+    # 理の知識ベース一覧
+    dcount = store.count_ri_docs()
+    drows = ""
+    for d in store.list_ri_docs():
+        snip = (d["body"][:44] + "…") if len(d["body"]) > 44 else d["body"]
+        drows += ("<tr><td><b>%s</b><br><span class='note'>%s</span></td><td>%s</td>"
+                  "<td><form method='post' style='display:inline' onsubmit=\"return confirm('削除しますか？')\">"
+                  "<input type='hidden' name='action' value='ridoc_delete'>"
+                  "<input type='hidden' name='doc_id' value='%s'>"
+                  "<button class='mini ghost'>削除</button></form></td></tr>") % (
+            escape(d["title"]), escape(snip), d["created_at"], d["id"])
+    drows = drows or "<tr><td colspan='3' class='note'>まだありません</td></tr>"
+
     body = """<h1>管理者画面</h1><p class="tag">理カード・オーナー専用（{user}）</p>
 {msg}
 <div class="card"><div class="top"><h2>今日の利用額</h2><a class="btn ghost mini" href="/">アプリへ</a></div>
@@ -788,10 +809,20 @@ def admin():
 <textarea name="ri_extra" id="ri_extra" rows="10" maxlength="5000" oninput="document.getElementById('richars').textContent=this.value.length" placeholder="例：急いては事を仕損じる。焦りは好転の前ぶれのこともある…">{ri_extra}</textarea>
 <div class="note" style="text-align:right"><span id="richars">0</span> / 5000 字</div>
 <button type="submit">理を保存</button></form>
-<script>document.getElementById('richars').textContent=document.getElementById('ri_extra').value.length;</script></div>""".format(
+<script>document.getElementById('richars').textContent=document.getElementById('ri_extra').value.length;</script></div>
+
+<div class="card"><h2>理の知識ベース（{dcount}件・検索して使う）</h2>
+<p class="note">講話・事例・原則を1件ずつ追加。相談ごとにAIが<b>関係するものだけ自動で探して</b>使います。何件でも貯められます（大量OK）。※名前・団体名は書かないでください。</p>
+<table><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
+<form method="post" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+<input type="hidden" name="action" value="ridoc_add">
+<label>タイトル（例：落ちたお金の理）</label><input type="text" name="doc_title">
+<label>本文（理の内容・原則・事例）</label>
+<textarea name="doc_body" rows="6" maxlength="20000" placeholder="例：お金は神様からの預かりもの。落ちた小銭は気づきのサイン。急がず、まず身の回りを整える…"></textarea>
+<button type="submit">この理を知識ベースに追加</button></form></div>""".format(
         user=escape(me["username"]), msg=mb, spent=int(spent),
         crows=crows or "<tr><td colspan='5' class='note'>まだありません</td></tr>",
-        urows=urows, ri_extra=ri_extra)
+        urows=urows, ri_extra=ri_extra, dcount=dcount, drows=drows)
     return _shell("管理者", body)
 
 

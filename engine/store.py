@@ -57,6 +57,80 @@ def get_setting(key, default=None):
         return default
 
 
+def _ensure_ri_docs():
+    with get_conn() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS ri_docs ("
+                     "id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, body TEXT, "
+                     "created_at TEXT DEFAULT (datetime('now','localtime')))")
+
+
+def add_ri_doc(title, body):
+    _ensure_ri_docs()
+    title = (title or "").strip() or "（無題）"
+    body = (body or "").strip()
+    if not body:
+        return
+    with get_conn() as conn:
+        conn.execute("INSERT INTO ri_docs(title, body) VALUES(?, ?)", (title, body))
+
+
+def list_ri_docs():
+    _ensure_ri_docs()
+    with get_conn() as conn:
+        rows = conn.execute("SELECT id, title, body, created_at FROM ri_docs "
+                            "ORDER BY id DESC").fetchall()
+    return [{"id": r["id"], "title": r["title"] or "", "body": r["body"] or "",
+             "created_at": (r["created_at"] or "")[:10]} for r in rows]
+
+
+def delete_ri_doc(doc_id):
+    _ensure_ri_docs()
+    with get_conn() as conn:
+        conn.execute("DELETE FROM ri_docs WHERE id=?", (int(doc_id),))
+
+
+def count_ri_docs():
+    _ensure_ri_docs()
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) AS n FROM ri_docs").fetchone()["n"]
+
+
+def _bigrams(s):
+    s = (s or "").replace("\n", "").replace("\r", "").replace(" ", "").replace("　", "")
+    if len(s) < 2:
+        return set([s]) if s else set()
+    return set(s[i:i + 2] for i in range(len(s) - 1))
+
+
+def search_ri_docs(query, k=4, max_chars=2500):
+    """相談文に関係する理だけを文字2-gramの重なりで探す（無料・ローカル・日本語/中国語可）。
+    上位k件・合計max_chars字まで。AIに渡るのはここで選ばれた分だけ＝コストは小さいまま。"""
+    qg = _bigrams(query)
+    if not qg:
+        return []
+    scored = []
+    for d in list_ri_docs():
+        dg = _bigrams(d["title"] + d["body"])
+        if not dg:
+            continue
+        overlap = len(qg & dg)
+        if overlap > 0:
+            scored.append((overlap, d))
+    scored.sort(key=lambda x: -x[0])
+    out, total = [], 0
+    for _, d in scored[:k]:
+        body = d["body"]
+        if total + len(body) > max_chars:
+            body = body[:max(0, max_chars - total)]
+        if not body:
+            break
+        out.append({"title": d["title"], "body": body})
+        total += len(body)
+        if total >= max_chars:
+            break
+    return out
+
+
 def _ensure_profiles():
     with get_conn() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS profiles ("
