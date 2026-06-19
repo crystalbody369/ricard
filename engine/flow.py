@@ -122,3 +122,43 @@ def build_flow(birth, date):
         "disclaimer": ("これは娯楽・自己内省のための目安です。"
                        "断定するものではありません。方位は簡易計算の参考です。"),
     }
+
+
+_GROUP_GLOSS = {
+    "比劫": "自立・仲間・勢い", "食傷": "出す・表現・才能",
+    "財": "つかむ・縁・お金", "官殺": "律する・責任・抑え", "印": "受け取る・学び・支え",
+}
+_BREL_LABEL = {
+    "clash": "冲（動きやすい・変化）", "harmony": "合（和む・つながる）",
+    "friction": "刑・害（小さな摩擦）", "calm": "穏やか",
+}
+
+
+def build_detail(birth, date):
+    """このカードが『何をもとに出ているか』を分かりやすく返す（誠実さの開示用）。"""
+    m = build_flow(birth, date)
+    bc = birth_chart(*birth)
+    dm = m["day_master"]
+    dm_elem = bc["day_master_element"]
+    strength_jp = "身強（エネルギー強め）" if m["strength"] == "strong" else "身弱（エネルギー控えめ）"
+    favor_jp = "追い風の日" if m["favor"] == "favorable" else "控えめにいく日"
+    rows = [
+        ["あなたの軸（日主）", "%s（%s）" % (dm, dm_elem)],
+        ["本命星（九星）", m["honmei_star"]],
+        ["体質（身強・身弱）", strength_jp],
+        ["今日の干支", m["day_pillar"]],
+        ["今日の十神", "%s（%s）" % (m["ten_god"], _GROUP_GLOSS[m["group"]])],
+        ["今日との相性", favor_jp],
+        ["人との関係（地支）", _BREL_LABEL[m["branch_rel"]]],
+        ["気の向く方位（九星）", m["direction"]],
+    ]
+    how = ("生年月日から四柱推命の命式（あなたの軸＝日主）を出し、"
+           "今日の干支との関係＝十神「%s」で今日のテーマを、"
+           "あなたの体質（身強・身弱）との相性で『追い風か控えめか』を、"
+           "今日とあなたの地支の関係で人との動きを、九星で方位を読んでいます。" % m["ten_god"])
+    return {
+        "methods": "四柱推命（生年月日からの命式）＋ 九星気学（方位）＋ 一神会『理』の考え方",
+        "rows": rows,
+        "how": how,
+        "note": "これは当てるためのものではなく、今日を整えるための目安です。断定はしません。",
+    }

@@ -15,11 +15,12 @@ try:
 except Exception:
     pass
 
-from flask import Flask, request, send_file, abort, Response
+from flask import Flask, request, send_file, abort, Response, jsonify
 
 from engine.voice import build_card
 from engine.card_image import render, render_view
 from engine.en import build_en
+from engine.flow import build_detail
 
 app = Flask(__name__)
 
@@ -60,6 +61,12 @@ PAGE = """<!doctype html>
         border-radius:10px; padding:10px 12px; margin:0 0 16px; display:none; }
   .foot{ text-align:center; color:var(--sub); font-size:12px; line-height:1.8; margin-top:30px; }
   .hidden{ display:none; }
+  .detail{ display:none; text-align:left; background:#fffaf0; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-top:12px; font-size:13px; line-height:1.8; }
+  .detail table{ width:100%; border-collapse:collapse; margin:6px 0; }
+  .detail td{ padding:3px 0; vertical-align:top; }
+  .detail td.k{ color:var(--sub); width:46%; }
+  .detail .how{ margin-top:8px; }
+  .detail .note{ color:var(--sub); font-size:12px; margin-top:8px; }
 </style>
 </head><body>
 <div class="wrap">
@@ -81,6 +88,8 @@ PAGE = """<!doctype html>
         <button class="ghost" onclick="saveImg('cardImg','riicard_today.png')">画像を保存</button>
         <button onclick="shareImg('cardImg','riicard_today.png')">シェア</button>
       </div>
+      <button class="ghost hidden" id="detailBtn" style="margin-top:10px" onclick="showDetail()">詳細（何をもとに占ってる？）</button>
+      <div id="detail" class="detail"></div>
     </div>
   </div>
 
@@ -132,6 +141,7 @@ function showCard(){
     img.src = url + '&_=' + Date.now();
     img.style.display = 'block';
     qs('cardBtns').classList.remove('hidden');
+    qs('detailBtn').classList.remove('hidden');
     if(!qs('enA').value) qs('enA').value = b;
   }catch(err){
     alert('エラー: ' + (err && err.message ? err.message : err));
@@ -185,6 +195,26 @@ function copyInvite(){
   } else {
     prompt('このリンクを送ってください', link);
   }
+}
+
+function renderDetail(j){
+  var html = '<div>占いの土台：' + j.methods + '</div><table>';
+  for(var i=0;i<j.rows.length;i++){ html += '<tr><td class="k">'+j.rows[i][0]+'</td><td>'+j.rows[i][1]+'</td></tr>'; }
+  html += '</table><div class="how">'+j.how+'</div><div class="note">'+j.note+'</div>';
+  return html;
+}
+function showDetail(){
+  var b = qs('me').value; if(!b){ alert('先に生年月日を入れてください'); return; }
+  var el = qs('detail');
+  if(el.style.display === 'block'){ el.style.display='none'; return; }
+  var t = qs('metime').value;
+  var url = '/api/detail?b=' + b + '&d=' + localToday();
+  if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
+  fetch(url).then(function(r){ return r.json(); }).then(function(j){
+    el.innerHTML = renderDetail(j);
+    el.style.display = 'block';
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+  }).catch(function(){ alert('詳細の取得に失敗しました。'); });
 }
 
 // 起動時：前回の生年月日を思い出して今日のカードを自動表示／招待リンク処理
@@ -258,6 +288,24 @@ def api_en():
     except Exception:
         abort(400)
     return _png(render_view(build_en(A, B), "morning"))
+
+
+@app.route("/api/detail")
+def api_detail():
+    b = request.args.get("b", "")
+    d = request.args.get("d", "")
+    h = request.args.get("h", "")
+    try:
+        birth = _parse(b)
+        if h != "":
+            birth = birth + (int(h),)
+    except Exception:
+        abort(400)
+    try:
+        target = _parse(d) if d else _server_today()
+    except Exception:
+        target = _server_today()
+    return jsonify(build_detail(birth, target))
 
 
 if __name__ == "__main__":
