@@ -970,7 +970,9 @@ def admin():
     body = """<h1>管理者画面</h1><p class="tag">理カード・オーナー専用（{user}）</p>
 {msg}
 <div class="card"><div class="top"><h2>今日の利用額</h2><a class="btn ghost mini" href="/">アプリへ</a></div>
-<p class="note">本日のAI利用：約 ¥{spent} / 上限の蓋つき。<a href="/logout">ログアウト</a></p></div>
+<p class="note">本日のAI利用：約 ¥{spent}（概算）/ 上限の蓋つき。</p>
+<p class="note"><a href="https://console.anthropic.com/settings/usage" target="_blank" rel="noopener" style="color:var(--gold)">▶ 実際のAPI利用額を確認（Anthropicコンソール）</a></p>
+<p class="note"><a href="https://dashboard.stripe.com/" target="_blank" rel="noopener" style="color:var(--gold)">▶ 売上を確認（Stripeダッシュボード）</a> ・ <a href="/logout">ログアウト</a></p></div>
 
 <div class="card"><h2>紹介コード</h2>
 <table><tr><th>コード</th><th>状態</th><th>登録人数</th><th>付与・無料</th><th></th></tr>{crows}</table>
