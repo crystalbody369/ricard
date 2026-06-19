@@ -72,6 +72,8 @@ PAGE = """<!doctype html>
     <h2>今日の理</h2>
     <label>あなたの生年月日</label>
     <input type="date" id="me" min="1900-01-01" max="2025-12-31">
+    <label>生まれた時間（わかれば・任意）</label>
+    <input type="time" id="metime">
     <button onclick="showCard()">今日の理を見る</button>
     <div class="result">
       <img id="cardImg" alt="今日の理カード">
@@ -105,12 +107,19 @@ PAGE = """<!doctype html>
 <script>
 function qs(id){ return document.getElementById(id); }
 
+function localToday(){
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+}
 function showCard(){
   var b = qs('me').value;
   if(!b){ alert('生年月日を選んでください'); return; }
-  try{ localStorage.setItem('ricard_birth', b); }catch(e){}
+  var t = qs('metime').value;  // "HH:MM" または ""
+  try{ localStorage.setItem('ricard_birth', b); localStorage.setItem('ricard_time', t); }catch(e){}
+  var url = '/api/card?b=' + b + '&d=' + localToday();
+  if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
   var img = qs('cardImg');
-  img.src = '/api/card?b=' + b + '&_=' + Date.now();
+  img.src = url + '&_=' + Date.now();
   img.style.display = 'block';
   qs('cardBtns').classList.remove('hidden');
   if(!qs('enA').value) qs('enA').value = b;
@@ -168,6 +177,8 @@ function copyInvite(){
   // 前回入れた生年月日を復元（端末内に保存・サーバーには送らない）
   try{
     var saved = localStorage.getItem('ricard_birth');
+    var savedT = localStorage.getItem('ricard_time');
+    if(savedT){ qs('metime').value = savedT; }
     if(saved){ qs('me').value = saved; showCard(); }
   }catch(e){}
   var en = p.get('en');
@@ -199,15 +210,26 @@ def _png(img):
     return send_file(buf, mimetype="image/png")
 
 
+def _server_today():
+    return (date.today().year, date.today().month, date.today().day)
+
+
 @app.route("/api/card")
 def api_card():
     b = request.args.get("b", "")
+    d = request.args.get("d", "")   # 閲覧者の端末ローカル日付（その人の"今日"）
+    h = request.args.get("h", "")   # 生まれた時間（任意・0〜23時）
     try:
         birth = _parse(b)
+        if h != "":
+            birth = birth + (int(h),)   # (年,月,日,時)
     except Exception:
         abort(400)
-    today = (date.today().year, date.today().month, date.today().day)
-    return _png(render(build_card(birth, today), "morning"))
+    try:
+        target = _parse(d) if d else _server_today()
+    except Exception:
+        target = _server_today()
+    return _png(render(build_card(birth, target), "morning"))
 
 
 @app.route("/api/en")
