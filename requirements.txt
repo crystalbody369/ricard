@@ -2,3 +2,4 @@ lunar_python
 pillow
 flask
 gunicorn
+anthropic

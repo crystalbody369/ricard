@@ -5,3 +5,4 @@ venv/
 data/
 *.png
 .DS_Store
+test_variety.py

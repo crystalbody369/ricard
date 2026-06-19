@@ -21,6 +21,9 @@ from engine.voice import build_card
 from engine.card_image import render, render_view
 from engine.en import build_en
 from engine.flow import build_detail
+from engine.ri_consult import consult
+
+CONSULT_MAX_CHARS = 500   # 入力の蓋（コスト上限を固定する）
 
 app = Flask(__name__)
 
@@ -69,6 +72,9 @@ PAGE = """<!doctype html>
   .detail .note{ color:var(--sub); font-size:12px; margin-top:8px; }
   .settings{ background:#fffaf0; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:6px; }
   select{ width:100%; padding:12px 14px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; }
+  textarea{ width:100%; padding:12px 14px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; resize:vertical; line-height:1.7; }
+  .ccount{ font-size:12px; color:var(--sub); text-align:right; margin:6px 2px 0; }
+  .ccount #cremain{ color:var(--gold); }
   .card h2{ display:flex; align-items:center; }
   .gear{ width:auto; margin-left:auto; padding:5px 12px; font-size:13px; background:transparent; color:var(--sub); border:1px solid var(--line); letter-spacing:0; }
   .langsw{ text-align:center; margin:0 0 22px; }
@@ -122,6 +128,16 @@ PAGE = """<!doctype html>
     </div>
   </div>
 
+  <div class="card">
+    <h2 data-i18n="h2consult">理に相談する</h2>
+    <p class="note" style="text-align:left; margin:0 0 10px" data-i18n="consultlead">気になった出来事を書くと、理の視点で静かに観ます。当てるのではなく、整えるために。</p>
+    <textarea id="cevent" maxlength="500" rows="3" data-ph="cplaceholder" oninput="qs('cchars').textContent=this.value.length" placeholder="例：道に鳥が死んでいた。朝、大きな雲を見た。古い友人に偶然会った。"></textarea>
+    <div class="ccount"><span id="cchars">0</span>/500　<span id="cremain"></span></div>
+    <button onclick="askConsult()" id="cbtn" data-i18n="btnconsult">理に観てもらう</button>
+    <p class="note" style="text-align:left" data-i18n="consultprivacy">※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。</p>
+    <div id="cresult" class="detail" style="white-space:pre-wrap; line-height:1.9;"></div>
+  </div>
+
   <p class="foot" data-i18n="foot">これは娯楽・自己内省のための目安です。当たり外れを決めるものではありません。</p>
 </div>
 
@@ -135,6 +151,11 @@ var I18N = {
        btnsaveimg:'画像を保存', btnshare:'シェア', btndetail:'詳細（何をもとに占ってる？）',
        h2en:'二人の縁', lblpartner:'お相手の生年月日（あなたの分は「今日の理」の設定から）',
        btnen:'二人の縁を見る', btninvite:'この縁を相手に送る',
+       h2consult:'理に相談する', consultlead:'気になった出来事を書くと、理の視点で静かに観ます。当てるのではなく、整えるために。',
+       cplaceholder:'例：道に鳥が死んでいた。朝、大きな雲を見た。古い友人に偶然会った。',
+       btnconsult:'理に観てもらう', consultprivacy:'※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。',
+       remain:'残り{n}回', consultempty:'出来事を書いてください。', consultlimit:'今日の無料分（3回）は終わりました。また明日どうぞ。',
+       consultwait:'理で観ています…', consultfail:'うまく言葉にできませんでした。少し時間をおいて、もう一度お試しください。',
        foot:'これは娯楽・自己内省のための目安です。当たり外れを決めるものではありません。', detailbase:'占いの土台：'},
   zh: {h1:'理卡', tag:'不為了算準，而是整理今天。', h2today:'今日之理', gear:'⚙ 設定',
        lblbirth:'你的生日', lbltime:'出生時間（若知道・可選）', lblgender:'性別（用於大運計算・可選）',
@@ -142,6 +163,11 @@ var I18N = {
        btnsaveimg:'儲存圖片', btnshare:'分享', btndetail:'詳細（依據什麼占算？）',
        h2en:'兩人的緣', lblpartner:'對方的生日（你的從「今日之理」設定）',
        btnen:'看兩人的緣', btninvite:'把這段緣分傳給對方',
+       h2consult:'向理諮詢', consultlead:'寫下在意的事，便以理的視角靜靜地觀照。不為算準，而是為了整理。',
+       cplaceholder:'例如：路上有隻死掉的鳥。早上看到一大片雲。偶然遇見老朋友。',
+       btnconsult:'請理為我觀照', consultprivacy:'※輸入的文字會送往AI（Claude）以產生回應，不會保存文字。',
+       remain:'剩餘{n}次', consultempty:'請先寫下事情。', consultlimit:'今天的免費次數（3次）已用完，明天再來。',
+       consultwait:'正以理觀照中…', consultfail:'這次沒能好好回應。請稍後再試一次。',
        foot:'這是供娛樂、自我省思的參考，並非用來斷定準不準。', detailbase:'占算依據：'}
 };
 var LANG = (function(){ try{ return localStorage.getItem('ricard_lang') || 'ja'; }catch(e){ return 'ja'; } })();
@@ -149,7 +175,10 @@ function applyI18n(){
   var t = I18N[LANG] || I18N.ja;
   var els = document.querySelectorAll('[data-i18n]');
   for(var i=0;i<els.length;i++){ var k=els[i].getAttribute('data-i18n'); if(t[k]!==undefined) els[i].textContent = t[k]; }
+  var phs = document.querySelectorAll('[data-ph]');
+  for(var j=0;j<phs.length;j++){ var pk=phs[j].getAttribute('data-ph'); if(t[pk]!==undefined) phs[j].placeholder = t[pk]; }
   document.documentElement.lang = (LANG==='zh' ? 'zh-Hant' : 'ja');
+  updateRemain();
 }
 function setLang(l){
   LANG = l; try{ localStorage.setItem('ricard_lang', l); }catch(e){}
@@ -240,6 +269,46 @@ function copyInvite(){
   } else {
     prompt('このリンクを送ってください', link);
   }
+}
+
+// ── 理に相談する（無料は1日3回・端末内でカウント）──────────────
+var CFREE = 3;
+function consultCount(){
+  var today = localToday(), n = 0;
+  try{
+    if(localStorage.getItem('ricard_consult_date') === today){ n = parseInt(localStorage.getItem('ricard_consult_count')||'0',10)||0; }
+    else { localStorage.setItem('ricard_consult_date', today); localStorage.setItem('ricard_consult_count','0'); }
+  }catch(e){}
+  return n;
+}
+function consultRemain(){ return Math.max(0, CFREE - consultCount()); }
+function updateRemain(){
+  var el = qs('cremain'); if(!el) return;
+  var t = I18N[LANG] || I18N.ja;
+  el.textContent = (t.remain || '残り{n}回').replace('{n}', consultRemain());
+}
+function bumpConsult(){
+  var today = localToday(), n = consultCount() + 1;
+  try{ localStorage.setItem('ricard_consult_date', today); localStorage.setItem('ricard_consult_count', String(n)); }catch(e){}
+  updateRemain();
+}
+async function askConsult(){
+  var t = I18N[LANG] || I18N.ja;
+  var ev = qs('cevent').value.trim();
+  if(!ev){ alert(t.consultempty); return; }
+  if(consultRemain() <= 0){ alert(t.consultlimit); return; }
+  var btn = qs('cbtn'), res = qs('cresult'), old = btn.textContent;
+  btn.disabled = true; btn.textContent = t.consultwait;
+  res.style.display = 'block'; res.textContent = t.consultwait;
+  try{
+    var r = await fetch('/api/consult', {method:'POST', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({event: ev, lang: LANG})});
+    var j = await r.json();
+    res.textContent = j.text || t.consultfail;
+    if(j.ok){ bumpConsult(); }
+  }catch(e){ res.textContent = t.consultfail; }
+  btn.disabled = false; btn.textContent = old;
+  res.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 function renderDetail(j){
@@ -359,6 +428,19 @@ def api_detail():
     except Exception:
         target = _server_today()
     return jsonify(build_detail(birth, target, g if g in ("m", "f") else None, lang))
+
+
+@app.route("/api/consult", methods=["POST"])
+def api_consult():
+    data = request.get_json(silent=True) or {}
+    event = (data.get("event") or "").strip()
+    lang = data.get("lang", "ja")
+    lang = lang if lang in ("ja", "zh") else "ja"
+    if not event:
+        return jsonify({"ok": False, "text": ""}), 400
+    if len(event) > CONSULT_MAX_CHARS:      # 入力の蓋（長文を物理的に拒否）
+        event = event[:CONSULT_MAX_CHARS]
+    return jsonify(consult(event, lang))
 
 
 if __name__ == "__main__":
