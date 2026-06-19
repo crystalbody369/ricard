@@ -888,6 +888,9 @@ def admin():
             elif a == "ri_import":
                 n = store.import_ri_seed()
                 msg = "同梱の理データを %d 件取り込みました。" % n
+            elif a == "ri_replace":
+                n = store.replace_ri_seed()
+                msg = "知識ベースを最新の基本データ（%d件）に入れ替えました。" % n
         except Exception as e:
             msg = "エラー: " + str(e)
 
@@ -958,28 +961,40 @@ def admin():
     drows = ""
     for d in store.list_ri_docs():
         snip = (d["body"][:44] + "…") if len(d["body"]) > 44 else d["body"]
-        drows += ("<tr data-s=\"%s\"><td onclick=\"toggleFull(this)\" style=\"cursor:pointer\"><b>%s</b><br>"
+        st = (d.get("strength") or "").strip()
+        badge = ("<span style='font-size:11px;color:var(--gold)'>[%s]</span> " % escape(st)) if st else ""
+        meta = ""
+        if d.get("cat") or d.get("ptype") or d.get("tags"):
+            meta = ("<div class='note' style='font-size:12px;margin-top:6px'>分類：%s／型：%s／タグ：%s</div>"
+                    % (escape(d.get("cat", "")), escape(d.get("ptype", "")), escape(d.get("tags", ""))))
+        drows += ("<tr data-s=\"%s\"><td onclick=\"toggleFull(this)\" style=\"cursor:pointer\">%s<b>%s</b><br>"
                   "<span class='note snip'>%s</span>"
-                  "<div class='full' style='display:none;font-size:13px;line-height:1.9;margin-top:6px;color:var(--ink)'>%s</div></td>"
+                  "<div class='full' style='display:none;font-size:13px;line-height:1.9;margin-top:6px;color:var(--ink)'>%s%s</div></td>"
                   "<td>%s</td>"
                   "<td><form method='post' style='display:inline' onsubmit=\"return confirm('削除しますか？')\">"
                   "<input type='hidden' name='action' value='ridoc_delete'>"
                   "<input type='hidden' name='doc_id' value='%s'>"
                   "<button class='mini ghost'>削除</button></form></td></tr>") % (
-            escape(d["title"] + d["body"]), escape(d["title"]), escape(snip),
-            escape(d["body"]), d["created_at"], d["id"])
+            escape(d["title"] + d["body"] + " " + d.get("tags", "")), badge, escape(d["title"]), escape(snip),
+            escape(d["body"]).replace("\n", "<br>"), meta, d["created_at"], d["id"])
     drows = drows or "<tr><td colspan='3' class='note'>まだありません</td></tr>"
 
-    # 取り込みボタン（未取り込みがある時だけ出す。済みなら「取り込み済み」表示）
-    pending = store.seed_pending_count()
-    if pending > 0:
+    # 取り込み／差し替えブロック。基本データの新版があれば「入れ替え」、無ければ状態表示。
+    seed_total = store.seed_count()
+    if not store.seed_is_current():
         import_block = (
-            '<form method="post" style="margin:0 0 12px"><input type="hidden" name="action" value="ri_import">'
-            '<button type="submit" class="ghost">同梱の理データ（未取り込み %d件）を取り込む</button>'
-            '<span class="note">　※あなたの記録・著作から作った理。重複は自動で飛ばします。</span></form>' % pending)
+            '<div class="card" style="margin:0 0 12px;border:1px solid var(--gold);background:#fbf7ee">'
+            '<b>基本データの新しい版があります（%d件）。</b>'
+            '<p class="note" style="margin:6px 0">これに入れ替えると、いまの知識ベースは<b>全て消えて</b>新版に置き換わります'
+            '（あなたが手で足した理も消えます）。これを今後の判断材料の土台にします。</p>'
+            '<form method="post" style="display:inline" onsubmit="return confirm(\'知識ベースを全消去して最新版に入れ替えます。よろしいですか？\')">'
+            '<input type="hidden" name="action" value="ri_replace">'
+            '<button type="submit">最新の基本データ（%d件）に入れ替える</button></form>'
+            '<form method="post" style="display:inline;margin-left:8px"><input type="hidden" name="action" value="ri_import">'
+            '<button type="submit" class="ghost">消さずに足りない分だけ追加</button></form></div>' % (seed_total, seed_total))
     else:
-        import_block = ('<div class="ok" style="margin:0 0 12px">✓ 同梱の理データ（%d件）は取り込み済みです。'
-                        '新しい理を私が足したときだけ、ここに取り込みボタンが出ます。</div>' % store.seed_count())
+        import_block = ('<div class="ok" style="margin:0 0 12px">✓ 基本データ（%d件・最新版）を取り込み済みです。'
+                        '私が新しい版を用意したときだけ、ここに入れ替えボタンが出ます。</div>' % seed_total)
 
     body = """<h1>管理者画面</h1><p class="tag">理カード・オーナー専用（{user}）</p>
 {msg}

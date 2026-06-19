@@ -62,24 +62,33 @@ def _ensure_ri_docs():
         conn.execute("CREATE TABLE IF NOT EXISTS ri_docs ("
                      "id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, body TEXT, "
                      "created_at TEXT DEFAULT (datetime('now','localtime')))")
+        # 旧テーブルからの移行：足りない列を追加（タグ・読みの強さ・判断型・大分類・注意点）
+        have = set(r["name"] for r in conn.execute("PRAGMA table_info(ri_docs)").fetchall())
+        for c in ("tags", "strength", "ptype", "cat", "note"):
+            if c not in have:
+                conn.execute("ALTER TABLE ri_docs ADD COLUMN %s TEXT DEFAULT ''" % c)
 
 
-def add_ri_doc(title, body):
+def add_ri_doc(title, body, tags="", strength="", ptype="", cat="", note=""):
     _ensure_ri_docs()
     title = (title or "").strip() or "（無題）"
     body = (body or "").strip()
     if not body:
         return
     with get_conn() as conn:
-        conn.execute("INSERT INTO ri_docs(title, body) VALUES(?, ?)", (title, body))
+        conn.execute("INSERT INTO ri_docs(title, body, tags, strength, ptype, cat, note) "
+                     "VALUES(?, ?, ?, ?, ?, ?, ?)",
+                     (title, body, tags or "", strength or "", ptype or "", cat or "", note or ""))
 
 
 def list_ri_docs():
     _ensure_ri_docs()
     with get_conn() as conn:
-        rows = conn.execute("SELECT id, title, body, created_at FROM ri_docs "
-                            "ORDER BY id DESC").fetchall()
+        rows = conn.execute("SELECT id, title, body, tags, strength, ptype, cat, note, created_at "
+                            "FROM ri_docs ORDER BY id DESC").fetchall()
     return [{"id": r["id"], "title": r["title"] or "", "body": r["body"] or "",
+             "tags": r["tags"] or "", "strength": r["strength"] or "",
+             "ptype": r["ptype"] or "", "cat": r["cat"] or "", "note": r["note"] or "",
              "created_at": (r["created_at"] or "")[:10]} for r in rows]
 
 
@@ -99,26 +108,45 @@ def _seed_path():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "ri_seed.json")
 
 
-def seed_count():
+def _seed_entries():
     p = _seed_path()
     if not os.path.exists(p):
-        return 0
+        return []
     try:
         with open(p, encoding="utf-8") as f:
-            return len(json.load(f))
+            return json.load(f)
     except (ValueError, OSError):
-        return 0
+        return []
+
+
+def seed_version():
+    """同梱データの版（ri_seed.version の文字列）。基本データを差し替えたら変わる。"""
+    p = os.path.join(os.path.dirname(_seed_path()), "ri_seed.version")
+    try:
+        with open(p, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def imported_version():
+    return get_setting("ri_seed_version", "") or ""
+
+
+def seed_count():
+    return len(_seed_entries())
+
+
+def seed_is_current():
+    """同梱の最新版が取り込み済みかどうか。"""
+    sv = seed_version()
+    return bool(sv) and (imported_version() == sv)
 
 
 def seed_pending_count():
     """同梱データのうち、まだ知識ベースに入っていない件数。0なら取り込み済み。"""
-    p = _seed_path()
-    if not os.path.exists(p):
-        return 0
-    try:
-        with open(p, encoding="utf-8") as f:
-            entries = json.load(f)
-    except (ValueError, OSError):
+    entries = _seed_entries()
+    if not entries:
         return 0
     _ensure_ri_docs()
     with get_conn() as conn:
@@ -127,25 +155,46 @@ def seed_pending_count():
                if (e.get("title") or "").strip() and (e.get("title") or "").strip() not in existing)
 
 
-def import_ri_seed():
-    """同梱の ri_seed.json から、まだ無いタイトルの理を知識ベースへ取り込む。追加件数を返す。"""
-    _ensure_ri_docs()
-    p = _seed_path()
-    if not os.path.exists(p):
-        return 0
-    with open(p, encoding="utf-8") as f:
-        entries = json.load(f)
+def _insert_seed_entries(conn, entries, existing):
     added = 0
+    for e in entries:
+        t = (e.get("title") or "").strip()
+        b = (e.get("body") or "").strip()
+        if not t or not b or t in existing:
+            continue
+        conn.execute("INSERT INTO ri_docs(title, body, tags, strength, ptype, cat, note) "
+                     "VALUES(?, ?, ?, ?, ?, ?, ?)",
+                     (t, b, e.get("tags") or "", e.get("strength") or "",
+                      e.get("ptype") or "", e.get("cat") or "", e.get("note") or ""))
+        existing.add(t)
+        added += 1
+    return added
+
+
+def import_ri_seed():
+    """同梱の ri_seed.json から、まだ無いタイトルの理を知識ベースへ追加取り込み。追加件数を返す。"""
+    _ensure_ri_docs()
+    entries = _seed_entries()
+    if not entries:
+        return 0
     with get_conn() as conn:
         existing = set(r["title"] for r in conn.execute("SELECT title FROM ri_docs").fetchall())
-        for e in entries:
-            t = (e.get("title") or "").strip()
-            b = (e.get("body") or "").strip()
-            if not t or not b or t in existing:
-                continue
-            conn.execute("INSERT INTO ri_docs(title, body) VALUES(?, ?)", (t, b))
-            existing.add(t)
-            added += 1
+        added = _insert_seed_entries(conn, entries, existing)
+    set_setting("ri_seed_version", seed_version())
+    return added
+
+
+def replace_ri_seed():
+    """知識ベースを全消去し、同梱の最新版で入れ替える（基本データの差し替え）。件数を返す。
+    ※管理者が手で足した理も一緒に消える。基本データを正式に更新するときに使う。"""
+    _ensure_ri_docs()
+    entries = _seed_entries()
+    if not entries:
+        return 0
+    with get_conn() as conn:
+        conn.execute("DELETE FROM ri_docs")
+        added = _insert_seed_entries(conn, entries, set())
+    set_setting("ri_seed_version", seed_version())
     return added
 
 
@@ -158,18 +207,21 @@ def _bigrams(s):
 
 def search_ri_docs(query, k=4, max_chars=2500):
     """相談文に関係する理だけを文字2-gramの重なりで探す（無料・ローカル・日本語/中国語可）。
+    タイトル・タグ（＝現象/キーワード）に当たった分を重く見て、現象に効く理を優先する。
     上位k件・合計max_chars字まで。AIに渡るのはここで選ばれた分だけ＝コストは小さいまま。"""
     qg = _bigrams(query)
     if not qg:
         return []
     scored = []
     for d in list_ri_docs():
-        dg = _bigrams(d["title"] + d["body"])
-        if not dg:
+        key_g = _bigrams(d["title"] + " " + d.get("tags", ""))   # 現象・タグ＝検索の効きどころ
+        body_g = _bigrams(d["body"])
+        if not (key_g or body_g):
             continue
-        overlap = len(qg & dg)
-        if overlap > 0:
-            scored.append((overlap, d))
+        # 現象・タグの一致は3倍重み、本文の一致は1倍
+        score = 3 * len(qg & key_g) + len(qg & body_g)
+        if score > 0:
+            scored.append((score, d))
     scored.sort(key=lambda x: -x[0])
     out, total = [], 0
     for _, d in scored[:k]:
@@ -178,7 +230,7 @@ def search_ri_docs(query, k=4, max_chars=2500):
             body = body[:max(0, max_chars - total)]
         if not body:
             break
-        out.append({"title": d["title"], "body": body})
+        out.append({"title": d["title"], "body": body, "strength": d.get("strength", "")})
         total += len(body)
         if total >= max_chars:
             break

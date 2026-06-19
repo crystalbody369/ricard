@@ -7,3 +7,5 @@ data/
 .DS_Store
 test_variety.py
 engine/seed/
+*.bak
+理_知識ベース_全件.md
