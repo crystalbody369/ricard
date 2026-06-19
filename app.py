@@ -208,6 +208,7 @@ PAGE = """<!doctype html>
   </div>
 
   <p class="foot" data-i18n="foot">これは娯楽・自己内省のための目安です。当たり外れを決めるものではありません。</p>
+  <p class="foot" style="margin-top:10px"><a href="/logout" style="color:var(--gold)" data-i18n="logout">ログアウト</a><!--ACCT--></p>
 </div>
 
 <script>
@@ -225,6 +226,7 @@ var I18N = {
        btnconsult:'理に観てもらう', consultprivacy:'※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。',
        remain:'残り{n}回', consultempty:'出来事を書いてください。', consultlimit:'今日の無料分（3回）は終わりました。また明日どうぞ。',
        consultwait:'理で観ています…', consultfail:'うまく言葉にできませんでした。少し時間をおいて、もう一度お試しください。',
+       logout:'ログアウト',
        foot:'これは娯楽・自己内省のための目安です。当たり外れを決めるものではありません。', detailbase:'占いの土台：'},
   zh: {h1:'理卡', tag:'不為了算準，而是整理今天。', h2today:'今日之理', gear:'⚙ 設定',
        lblbirth:'你的生日', lbltime:'出生時間（若知道・可選）', lblgender:'性別（用於大運計算・可選）',
@@ -237,6 +239,7 @@ var I18N = {
        btnconsult:'請理為我觀照', consultprivacy:'※輸入的文字會送往AI（Claude）以產生回應，不會保存文字。',
        remain:'剩餘{n}次', consultempty:'請先寫下事情。', consultlimit:'今天的免費次數（3次）已用完，明天再來。',
        consultwait:'正以理觀照中…', consultfail:'這次沒能好好回應。請稍後再試一次。',
+       logout:'登出',
        foot:'這是供娛樂、自我省思的參考，並非用來斷定準不準。', detailbase:'占算依據：'}
 };
 var LANG = (function(){ try{ return localStorage.getItem('ricard_lang') || 'ja'; }catch(e){ return 'ja'; } })();
@@ -428,7 +431,10 @@ function showDetail(){
 @app.route("/")
 @login_required
 def index():
-    resp = Response(PAGE, mimetype="text/html")
+    u = _current_user()
+    acct = ('  ・  <a href="/admin" style="color:var(--gold)">管理者画面</a>'
+            if (u and u["is_admin"]) else "")
+    resp = Response(PAGE.replace("<!--ACCT-->", acct), mimetype="text/html")
     # 常に最新ページを配る（古いキャッシュで新機能が動かないのを防ぐ）
     resp.headers["Cache-Control"] = "no-store, max-age=0"
     return resp
