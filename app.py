@@ -585,6 +585,7 @@ def _shell(title, body):
  table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0;}
  th,td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;}
  th{color:var(--sub);font-weight:500;}
+ #kbtable th{position:sticky;top:0;background:#fffdf8;z-index:1;}
  .row{display:flex;gap:8px;flex-wrap:wrap;}
  .note{font-size:12px;color:var(--sub);margin:6px 0;}
  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
@@ -834,7 +835,9 @@ def admin():
 <span class="note">　※あなたの記録・著作から作った理。重複は自動で飛ばします。</span></form>
 <input type="text" id="kbsearch" oninput="filterKB()" placeholder="理を検索（お金 / 縁 / 焦り / 言葉 など）">
 <div class="note" style="margin:4px 2px">表示中 <span id="kbcount">{dcount}</span> 件</div>
+<div style="max-height:380px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px;">
 <table id="kbtable"><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
+</div>
 <form method="post" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
 <input type="hidden" name="action" value="ridoc_add">
 <label>タイトル（例：落ちたお金の理）</label><input type="text" name="doc_title">
