@@ -10,12 +10,62 @@
   3. 理の土台は"要約版"（メモリ全文ではない）
   4. 1日3回はクライアント側で制御（app.py / フロント）
   5. プロンプトキャッシュで土台の再送コストを圧縮
+
+加えて、サーバー側の最終防衛＝「1日の総額上限」。
+今日の推定利用額が上限に達したら、それ以上 AI を呼ばない（暴走請求を物理的に防ぐ）。
+※これは best-effort（プロセス内カウント）。本当の hard cap は Anthropic コンソールの
+  使用上限（HIRO が設定）＋ Phase2 で入れる DB ベースのカウント。
 """
 
 import os
+import datetime
 
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 600
+
+# ── コスト見積り（Sonnet 概算・保守的に全量を満額計算）────────────
+PRICE_IN_USD = 3.0 / 1_000_000     # 入力 1 トークンあたり USD
+PRICE_OUT_USD = 15.0 / 1_000_000   # 出力 1 トークンあたり USD
+USD_JPY = 150.0
+DEFAULT_DAILY_BUDGET_JPY = 500.0   # 既定の1日総額上限（環境変数で変更可）
+
+# プロセス内の当日累計（best-effort）
+_spend = {"date": None, "jpy": 0.0}
+
+
+def _today():
+    return datetime.date.today().isoformat()
+
+
+def _daily_budget_jpy():
+    try:
+        return float(os.environ.get("RICARD_DAILY_BUDGET_JPY", DEFAULT_DAILY_BUDGET_JPY))
+    except (TypeError, ValueError):
+        return DEFAULT_DAILY_BUDGET_JPY
+
+
+def _spent_today():
+    if _spend["date"] != _today():      # 日付が変わったらリセット
+        _spend["date"] = _today()
+        _spend["jpy"] = 0.0
+    return _spend["jpy"]
+
+
+def _add_spend(jpy):
+    _spent_today()                      # 念のためロールオーバー確認
+    _spend["jpy"] += jpy
+
+
+def _usage_to_jpy(usage):
+    """msg.usage から当回の概算コスト（円）。キャッシュ読みも満額で保守的に。"""
+    if usage is None:
+        return 0.0
+    inp = (getattr(usage, "input_tokens", 0) or 0)
+    inp += (getattr(usage, "cache_creation_input_tokens", 0) or 0)
+    inp += (getattr(usage, "cache_read_input_tokens", 0) or 0)
+    out = (getattr(usage, "output_tokens", 0) or 0)
+    return (inp * PRICE_IN_USD + out * PRICE_OUT_USD) * USD_JPY
+
 
 # ── 理の土台（AIへの指示＝観方と、やってはいけないこと）──────────────
 _CORPUS = {
@@ -85,16 +135,22 @@ _FAIL = {
     "ja": "うまく言葉にできませんでした。少し時間をおいて、もう一度試してみてください。",
     "zh": "這次沒能好好回應。請稍後再試一次。",
 }
+_OVER = {
+    "ja": "本日の相談はたくさんのご利用をいただき、いったんお休みです。また明日どうぞ。",
+    "zh": "今天的諮詢使用量已滿，先暫歇。明天再來。",
+}
 
 
 def consult(event, lang="ja"):
     """出来事の文字列を理の視点で観た短い文を返す。
-    戻り値: {"text": str, "ok": bool}"""
+    戻り値: {"text": str, "ok": bool, ...}"""
     if lang not in _CORPUS:
         lang = "ja"
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         return {"text": _NO_KEY[lang], "ok": False}
+    if _spent_today() >= _daily_budget_jpy():          # 最終防衛：1日の総額上限
+        return {"text": _OVER[lang], "ok": False, "over_budget": True}
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
@@ -111,6 +167,7 @@ def consult(event, lang="ja"):
                 "content": _ASK[lang].format(event=event),
             }],
         )
+        _add_spend(_usage_to_jpy(getattr(msg, "usage", None)))  # 実使用量で当日累計に加算
         parts = [b.text for b in msg.content if getattr(b, "type", "") == "text"]
         text = "\n".join(parts).strip()
         if not text:

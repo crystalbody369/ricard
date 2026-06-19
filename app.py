@@ -24,6 +24,33 @@ from engine.flow import build_detail
 from engine.ri_consult import consult
 
 CONSULT_MAX_CHARS = 500   # 入力の蓋（コスト上限を固定する）
+CONSULT_IP_DAILY = 10     # サーバー側の最終防衛：1IP/1日の相談回数（端末側3回とは別の網）
+
+import datetime as _dt
+_ip_hits = {}             # ip -> {"date": iso, "n": int}（best-effort・プロセス内）
+
+
+def _client_ip():
+    fwd = request.headers.get("X-Forwarded-For", "")   # Render はプロキシ越し
+    return (fwd.split(",")[0].strip() if fwd else request.remote_addr) or "unknown"
+
+
+def _ip_over_limit(ip):
+    today = _dt.date.today().isoformat()
+    rec = _ip_hits.get(ip)
+    if not rec or rec["date"] != today:
+        _ip_hits[ip] = {"date": today, "n": 0}
+        rec = _ip_hits[ip]
+    return rec["n"] >= CONSULT_IP_DAILY
+
+
+def _ip_bump(ip):
+    today = _dt.date.today().isoformat()
+    rec = _ip_hits.get(ip)
+    if not rec or rec["date"] != today:
+        _ip_hits[ip] = {"date": today, "n": 1}
+    else:
+        rec["n"] += 1
 
 app = Flask(__name__)
 
@@ -440,7 +467,15 @@ def api_consult():
         return jsonify({"ok": False, "text": ""}), 400
     if len(event) > CONSULT_MAX_CHARS:      # 入力の蓋（長文を物理的に拒否）
         event = event[:CONSULT_MAX_CHARS]
-    return jsonify(consult(event, lang))
+    ip = _client_ip()
+    if _ip_over_limit(ip):                   # サーバー側IP制限（端末カウントのすり抜け対策）
+        msg = "今日のご利用が多いため、いったんお休みです。また明日どうぞ。" if lang == "ja" \
+              else "今天使用量較多，先暫歇，明天再來。"
+        return jsonify({"ok": False, "text": msg}), 429
+    result = consult(event, lang)
+    if result.get("ok"):
+        _ip_bump(ip)                         # 成功時のみカウント
+    return jsonify(result)
 
 
 if __name__ == "__main__":
