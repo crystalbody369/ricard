@@ -32,6 +32,7 @@ from engine import store
 from engine import auth
 
 CONSULT_MAX_CHARS = 500   # 入力の蓋（コスト上限を固定する）
+CONSULT_SIT_CHARS = 300   # 気持ち・状況欄の上限
 CONSULT_IP_DAILY = 10     # サーバー側の最終防衛：1IP/1日の相談回数（端末側3回とは別の網）
 
 
@@ -202,6 +203,9 @@ PAGE = """<!doctype html>
     <p class="note" style="text-align:left; margin:0 0 10px" data-i18n="consultlead">気になった出来事を書くと、理の視点で静かに観ます。当てるのではなく、整えるために。</p>
     <textarea id="cevent" maxlength="500" rows="3" data-ph="cplaceholder" oninput="qs('cchars').textContent=this.value.length" placeholder="例：道に鳥が死んでいた。朝、大きな雲を見た。古い友人に偶然会った。"></textarea>
     <div class="ccount"><span id="cchars">0</span>/500　<span id="cremain"></span></div>
+    <label data-i18n="csitlabel" style="margin-top:10px">今の気持ち・状況・取り組んでいること（任意）</label>
+    <textarea id="csituation" maxlength="300" rows="2" data-ph="csitph" placeholder="例：新しい仕事を始めたばかりで不安。いろいろ手を広げて落ち着かない。"></textarea>
+    <p class="note" style="text-align:left;margin:4px 0 0" data-i18n="csithint">※気持ちや状況も書くほど、あなたに合った観方になります。</p>
     <button onclick="askConsult()" id="cbtn" data-i18n="btnconsult">理に観てもらう</button>
     <p class="note" style="text-align:left" data-i18n="consultprivacy">※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。</p>
     <div id="cresult" class="detail" style="white-space:pre-wrap; line-height:1.9;"></div>
@@ -224,6 +228,8 @@ var I18N = {
        h2consult:'理に相談する', consultlead:'気になった出来事を書くと、理の視点で静かに観ます。当てるのではなく、整えるために。',
        cplaceholder:'例：道に鳥が死んでいた。朝、大きな雲を見た。古い友人に偶然会った。',
        btnconsult:'理に観てもらう', consultprivacy:'※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。',
+       csitlabel:'今の気持ち・状況・取り組んでいること（任意）', csitph:'例：新しい仕事を始めたばかりで不安。いろいろ手を広げて落ち着かない。',
+       csithint:'※気持ちや状況も書くほど、あなたに合った観方になります。',
        remain:'残り{n}回', consultempty:'出来事を書いてください。', consultlimit:'今日の無料分（3回）は終わりました。また明日どうぞ。',
        consultwait:'理で観ています…', consultfail:'うまく言葉にできませんでした。少し時間をおいて、もう一度お試しください。',
        logout:'ログアウト',
@@ -237,6 +243,8 @@ var I18N = {
        h2consult:'向理諮詢', consultlead:'寫下在意的事，便以理的視角靜靜地觀照。不為算準，而是為了整理。',
        cplaceholder:'例如：路上有隻死掉的鳥。早上看到一大片雲。偶然遇見老朋友。',
        btnconsult:'請理為我觀照', consultprivacy:'※輸入的文字會送往AI（Claude）以產生回應，不會保存文字。',
+       csitlabel:'此刻的心情・處境・正在投入的事（可選）', csitph:'例如：剛開始新工作很不安，手伸得太廣靜不下來。',
+       csithint:'※越是寫下心情與處境，越能得到貼近你的觀照。',
        remain:'剩餘{n}次', consultempty:'請先寫下事情。', consultlimit:'今天的免費次數（3次）已用完，明天再來。',
        consultwait:'正以理觀照中…', consultfail:'這次沒能好好回應。請稍後再試一次。',
        logout:'登出',
@@ -380,8 +388,9 @@ async function askConsult(){
   btn.disabled = true; btn.textContent = t.consultwait;
   res.style.display = 'block'; res.textContent = t.consultwait;
   try{
+    var sit = qs('csituation') ? qs('csituation').value.trim() : '';
     var r = await fetch('/api/consult', {method:'POST', headers:{'Content-Type':'application/json'},
-                        body: JSON.stringify({event: ev, lang: LANG})});
+                        body: JSON.stringify({event: ev, situation: sit, lang: LANG})});
     var j = await r.json();
     res.textContent = j.text || t.consultfail;
     if(j.ok){ bumpConsult(); }
@@ -542,13 +551,14 @@ def api_consult():
         return jsonify({"ok": False, "text": ""}), 400
     if len(event) > CONSULT_MAX_CHARS:      # 入力の蓋（長文を物理的に拒否）
         event = event[:CONSULT_MAX_CHARS]
+    situation = (data.get("situation") or "").strip()[:CONSULT_SIT_CHARS]
     ip = _client_ip()
     if _ip_over_limit(ip):                   # サーバー側IP制限（端末カウントのすり抜け対策）
         msg = "今日のご利用が多いため、いったんお休みです。また明日どうぞ。" if lang == "ja" \
               else "今天使用量較多，先暫歇，明天再來。"
         return jsonify({"ok": False, "text": msg}), 429
-    kb = store.search_ri_docs(event)         # 関係する理だけを検索（DB全部は読まない）
-    result = consult(event, lang, kb_docs=kb)
+    kb = store.search_ri_docs((event + " " + situation).strip())   # 出来事＋状況で関連検索
+    result = consult(event, lang, kb_docs=kb, situation=situation)
     if result.get("ok"):
         _ip_bump(ip)                         # 成功時のみカウント
     return jsonify(result)

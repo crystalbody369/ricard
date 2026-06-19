@@ -131,6 +131,11 @@ _ASK = {
     "zh": "請以「理」的視角，簡短地觀照以下這件事。\n\n事情：{event}",
 }
 
+_SIT = {
+    "ja": "相談者の今の気持ち・状況・取り組んでいること：{s}\nこの状況に引き寄せて、その人だけに合った観方を差し出してください。\n\n",
+    "zh": "對方此刻的心情・處境・正在投入的事：{s}\n請貼近這個狀況，給出只適合他的觀照。\n\n",
+}
+
 _NO_KEY = {
     "ja": "（相談機能は準備中です。少しお待ちください。）",
     "zh": "（諮詢功能準備中，請稍候。）",
@@ -160,9 +165,10 @@ def _with_kb(ask, kb_docs, lang):
     return head + "\n" + lines + "\n\n" + ask
 
 
-def consult(event, lang="ja", kb_docs=None):
+def consult(event, lang="ja", kb_docs=None, situation=""):
     """出来事の文字列を理の視点で観た短い文を返す。
     kb_docs: 知識ベースから検索された関係する理（[{title, body}]）。
+    situation: 相談者の今の気持ち・状況（任意。あればその人に合わせて読む）。
     戻り値: {"text": str, "ok": bool, ...}"""
     if lang not in _CORPUS:
         lang = "ja"
@@ -188,7 +194,9 @@ def consult(event, lang="ja", kb_docs=None):
             }],
             messages=[{
                 "role": "user",
-                "content": _with_kb(_ASK[lang].format(event=event), kb_docs, lang),
+                "content": _with_kb(
+                    (_SIT[lang].format(s=situation) if (situation or "").strip() else "")
+                    + _ASK[lang].format(event=event), kb_docs, lang),
             }],
         )
         store.add_spend(_usage_to_jpy(getattr(msg, "usage", None)))  # 実使用量で当日累計に加算（永続）
