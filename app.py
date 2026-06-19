@@ -150,6 +150,10 @@ PAGE = """<!doctype html>
   .settings{ background:#fffaf0; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:6px; }
   select{ width:100%; padding:12px 14px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; }
   textarea{ width:100%; padding:12px 14px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; resize:vertical; line-height:1.7; }
+  .exchip{ font-size:13px; line-height:1.5; text-align:left; padding:8px 12px; border:1px solid var(--line);
+           border-radius:999px; background:#fffaf0; color:var(--ink); cursor:pointer; font-family:inherit;
+           width:auto; margin:0; transition:background .15s; }
+  .exchip:hover{ background:#f6edda; border-color:var(--gold); }
   .ccount{ font-size:12px; color:var(--sub); text-align:right; margin:6px 2px 0; }
   .ccount #cremain{ color:var(--gold); }
   .card h2{ display:flex; align-items:center; }
@@ -208,6 +212,14 @@ PAGE = """<!doctype html>
   <div class="card">
     <h2 data-i18n="h2consult">理に相談する</h2>
     <p class="note" style="text-align:left; margin:0 0 10px" data-i18n="consultlead">気になった出来事を書くと、理の視点で静かに観ます。当てるのではなく、整えるために。</p>
+    <div id="cexamples" style="margin:0 0 10px">
+      <p class="note" style="text-align:left;margin:0 0 6px" data-i18n="cexlead">はじめての方へ — どう書けばいい？ タップすると例文が入ります：</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <button type="button" class="exchip" onclick="useExample(0)"></button>
+        <button type="button" class="exchip" onclick="useExample(1)"></button>
+        <button type="button" class="exchip" onclick="useExample(2)"></button>
+      </div>
+    </div>
     <textarea id="cevent" maxlength="500" rows="3" data-ph="cplaceholder" oninput="qs('cchars').textContent=this.value.length" placeholder="例：道に鳥が死んでいた。朝、大きな雲を見た。古い友人に偶然会った。"></textarea>
     <div class="ccount"><span id="cchars">0</span>/500　<span id="cremain"></span></div>
     <label data-i18n="csitlabel" style="margin-top:10px">今の気持ち・状況・取り組んでいること（任意）</label>
@@ -238,6 +250,7 @@ var I18N = {
        btnconsult:'理に観てもらう', consultprivacy:'※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。',
        csitlabel:'今の気持ち・状況・取り組んでいること（任意）', csitph:'例：新しい仕事を始めたばかりで不安。いろいろ手を広げて落ち着かない。',
        csithint:'※気持ちや状況も書くほど、あなたに合った観方になります。', btnbuy:'クレジットを購入（30回 ¥500）',
+       cexlead:'はじめての方へ — どう書けばいい？ タップすると例文が入ります：',
        paidthanks:'ご購入ありがとうございます。回数が追加されました。',
        remain:'残り{n}回', consultempty:'出来事を書いてください。', consultlimit:'今日の無料分（3回）は終わりました。また明日どうぞ。',
        consultwait:'理で観ています…', consultfail:'うまく言葉にできませんでした。少し時間をおいて、もう一度お試しください。',
@@ -254,12 +267,50 @@ var I18N = {
        btnconsult:'請理為我觀照', consultprivacy:'※輸入的文字會送往AI（Claude）以產生回應，不會保存文字。',
        csitlabel:'此刻的心情・處境・正在投入的事（可選）', csitph:'例如：剛開始新工作很不安，手伸得太廣靜不下來。',
        csithint:'※越是寫下心情與處境，越能得到貼近你的觀照。', btnbuy:'購買點數（30次 ¥500）',
+       cexlead:'第一次使用嗎 — 該怎麼寫？ 點一下就會帶入範例：',
        paidthanks:'感謝您的購買，次數已增加。',
        remain:'剩餘{n}次', consultempty:'請先寫下事情。', consultlimit:'今天的免費次數（3次）已用完，明天再來。',
        consultwait:'正以理觀照中…', consultfail:'這次沒能好好回應。請稍後再試一次。',
        logout:'登出',
        foot:'這是供娛樂、自我省思的參考，並非用來斷定準不準。', detailbase:'占算依據：'}
 };
+// 相談の参考例（タップで入力欄に入る）。chip=ボタンに出す短い見出し。
+var CEX = {
+  ja: [
+    {chip:'🩹 物が壊れた・ほどけた',
+     ev:'家を出ようとした直前に、お気に入りの腕時計のベルトが切れた。',
+     sit:'最近うまく進まないことが続いていて、少し疲れている。何か見直すことがあるのか気になっている。'},
+    {chip:'🤝 偶然の再会・連絡',
+     ev:'しばらく連絡のなかった知り合いから、ふと連絡が来た。',
+     sit:'その人との関係を続けるか、少し距離を置くか迷っている。この巡り合わせに意味があるのか知りたい。'},
+    {chip:'🔁 小さなことが重なった',
+     ev:'大事な決断をしようとした日に、立て続けに小さなトラブルが続いた。',
+     sit:'今このまま進めるべきか、一度立ち止まるべきか迷っている。'}
+  ],
+  zh: [
+    {chip:'🩹 東西壞了・斷了',
+     ev:'正要出門前，心愛的手錶錶帶突然斷了。',
+     sit:'最近諸事不太順、有點累。想知道是不是有什麼該重新檢視的。'},
+    {chip:'🤝 偶然重逢・來訊',
+     ev:'許久沒聯絡的人，忽然傳來訊息。',
+     sit:'在猶豫要繼續這段關係，還是稍微保持距離。想知道這份巧合是否有意義。'},
+    {chip:'🔁 小事接連發生',
+     ev:'正要做重要決定的那天，接連發生了好幾件小狀況。',
+     sit:'在猶豫該就這樣前進，還是先停下來看看。'}
+  ]
+};
+function renderExamples(){
+  var ex = CEX[LANG] || CEX.ja;
+  var btns = document.querySelectorAll('.exchip');
+  for(var i=0;i<btns.length;i++){ if(ex[i]) btns[i].textContent = ex[i].chip; }
+}
+function useExample(i){
+  var ex = (CEX[LANG] || CEX.ja)[i]; if(!ex) return;
+  qs('cevent').value = ex.ev; qs('csituation').value = ex.sit;
+  qs('cchars').textContent = ex.ev.length;
+  qs('cevent').focus();
+  qs('cevent').scrollIntoView({behavior:'smooth', block:'center'});
+}
 var LANG = (function(){ try{ return localStorage.getItem('ricard_lang') || 'ja'; }catch(e){ return 'ja'; } })();
 function applyI18n(){
   var t = I18N[LANG] || I18N.ja;
@@ -268,6 +319,7 @@ function applyI18n(){
   var phs = document.querySelectorAll('[data-ph]');
   for(var j=0;j<phs.length;j++){ var pk=phs[j].getAttribute('data-ph'); if(t[pk]!==undefined) phs[j].placeholder = t[pk]; }
   document.documentElement.lang = (LANG==='zh' ? 'zh-Hant' : 'ja');
+  renderExamples();
   refreshBalance();
 }
 function setLang(l){
