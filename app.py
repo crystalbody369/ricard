@@ -71,56 +71,93 @@ PAGE = """<!doctype html>
   select{ width:100%; padding:12px 14px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; }
   .card h2{ display:flex; align-items:center; }
   .gear{ width:auto; margin-left:auto; padding:5px 12px; font-size:13px; background:transparent; color:var(--sub); border:1px solid var(--line); letter-spacing:0; }
+  .langsw{ text-align:center; margin:0 0 22px; }
+  .lang{ width:auto; margin:0 4px; padding:4px 14px; font-size:13px; background:transparent; color:var(--sub); border:1px solid var(--line); letter-spacing:0; }
 </style>
 </head><body>
 <div class="wrap">
-  <h1>理カード</h1>
-  <p class="tag">今日を、当てずに整える。</p>
+  <h1 data-i18n="h1">理カード</h1>
+  <p class="tag" data-i18n="tag">今日を、当てずに整える。</p>
+  <div class="langsw">
+    <button class="lang" onclick="setLang('ja')">日本語</button>
+    <button class="lang" onclick="setLang('zh')">繁體中文</button>
+  </div>
 
   <div class="banner" id="banner"></div>
 
   <div class="card">
-    <h2>今日の理<button class="gear" onclick="toggleSettings()">⚙ 設定</button></h2>
+    <h2><span data-i18n="h2today">今日の理</span><button class="gear" onclick="toggleSettings()" data-i18n="gear">⚙ 設定</button></h2>
     <div id="settings" class="settings">
-      <label>あなたの生年月日</label>
+      <label data-i18n="lblbirth">あなたの生年月日</label>
       <input type="date" id="me" min="1900-01-01" max="2025-12-31">
-      <label>生まれた時間（わかれば・任意）</label>
+      <label data-i18n="lbltime">生まれた時間（わかれば・任意）</label>
       <input type="time" id="metime">
-      <label>性別（大運の計算に使用・任意）</label>
-      <select id="gender"><option value="">選ばない</option><option value="m">男性</option><option value="f">女性</option></select>
-      <button onclick="saveAndShow()">保存して今日の理を見る</button>
+      <label data-i18n="lblgender">性別（大運の計算に使用・任意）</label>
+      <select id="gender"><option value="" data-i18n="optnone">選ばない</option><option value="m" data-i18n="optm">男性</option><option value="f" data-i18n="optf">女性</option></select>
+      <button onclick="saveAndShow()" data-i18n="btnsave">保存して今日の理を見る</button>
     </div>
     <div class="result">
       <img id="cardImg" alt="今日の理カード">
       <div class="row hidden" id="cardBtns">
-        <button class="ghost" onclick="saveImg('cardImg','riicard_today.png')">画像を保存</button>
-        <button onclick="shareImg('cardImg','riicard_today.png')">シェア</button>
+        <button class="ghost" onclick="saveImg('cardImg','riicard_today.png')" data-i18n="btnsaveimg">画像を保存</button>
+        <button onclick="shareImg('cardImg','riicard_today.png')" data-i18n="btnshare">シェア</button>
       </div>
-      <button class="ghost hidden" id="detailBtn" style="margin-top:10px" onclick="showDetail()">詳細（何をもとに占ってる？）</button>
+      <button class="ghost hidden" id="detailBtn" style="margin-top:10px" onclick="showDetail()" data-i18n="btndetail">詳細（何をもとに占ってる？）</button>
       <div id="detail" class="detail"></div>
     </div>
   </div>
 
   <div class="card">
-    <h2>二人の縁</h2>
-    <label>お相手の生年月日（あなたの分は「今日の理」の設定から）</label>
+    <h2 data-i18n="h2en">二人の縁</h2>
+    <label data-i18n="lblpartner">お相手の生年月日（あなたの分は「今日の理」の設定から）</label>
     <input type="date" id="enB" min="1900-01-01" max="2025-12-31">
-    <button onclick="showEn()">二人の縁を見る</button>
-    <button class="ghost" onclick="copyInvite()">この縁を相手に送る</button>
+    <button onclick="showEn()" data-i18n="btnen">二人の縁を見る</button>
+    <button class="ghost" onclick="copyInvite()" data-i18n="btninvite">この縁を相手に送る</button>
     <div class="result">
       <img id="enImg" alt="二人の縁カード">
       <div class="row hidden" id="enBtns">
-        <button class="ghost" onclick="saveImg('enImg','riicard_en.png')">画像を保存</button>
-        <button onclick="shareImg('enImg','riicard_en.png')">シェア</button>
+        <button class="ghost" onclick="saveImg('enImg','riicard_en.png')" data-i18n="btnsaveimg">画像を保存</button>
+        <button onclick="shareImg('enImg','riicard_en.png')" data-i18n="btnshare">シェア</button>
       </div>
     </div>
   </div>
 
-  <p class="foot">これは娯楽・自己内省のための目安です。<br>当たり外れを決めるものではありません。</p>
+  <p class="foot" data-i18n="foot">これは娯楽・自己内省のための目安です。当たり外れを決めるものではありません。</p>
 </div>
 
 <script>
 function qs(id){ return document.getElementById(id); }
+
+var I18N = {
+  ja: {h1:'理カード', tag:'今日を、当てずに整える。', h2today:'今日の理', gear:'⚙ 設定',
+       lblbirth:'あなたの生年月日', lbltime:'生まれた時間（わかれば・任意）', lblgender:'性別（大運の計算に使用・任意）',
+       optnone:'選ばない', optm:'男性', optf:'女性', btnsave:'保存して今日の理を見る',
+       btnsaveimg:'画像を保存', btnshare:'シェア', btndetail:'詳細（何をもとに占ってる？）',
+       h2en:'二人の縁', lblpartner:'お相手の生年月日（あなたの分は「今日の理」の設定から）',
+       btnen:'二人の縁を見る', btninvite:'この縁を相手に送る',
+       foot:'これは娯楽・自己内省のための目安です。当たり外れを決めるものではありません。', detailbase:'占いの土台：'},
+  zh: {h1:'理卡', tag:'不為了算準，而是整理今天。', h2today:'今日之理', gear:'⚙ 設定',
+       lblbirth:'你的生日', lbltime:'出生時間（若知道・可選）', lblgender:'性別（用於大運計算・可選）',
+       optnone:'不選', optm:'男', optf:'女', btnsave:'儲存並看今日之理',
+       btnsaveimg:'儲存圖片', btnshare:'分享', btndetail:'詳細（依據什麼占算？）',
+       h2en:'兩人的緣', lblpartner:'對方的生日（你的從「今日之理」設定）',
+       btnen:'看兩人的緣', btninvite:'把這段緣分傳給對方',
+       foot:'這是供娛樂、自我省思的參考，並非用來斷定準不準。', detailbase:'占算依據：'}
+};
+var LANG = (function(){ try{ return localStorage.getItem('ricard_lang') || 'ja'; }catch(e){ return 'ja'; } })();
+function applyI18n(){
+  var t = I18N[LANG] || I18N.ja;
+  var els = document.querySelectorAll('[data-i18n]');
+  for(var i=0;i<els.length;i++){ var k=els[i].getAttribute('data-i18n'); if(t[k]!==undefined) els[i].textContent = t[k]; }
+  document.documentElement.lang = (LANG==='zh' ? 'zh-Hant' : 'ja');
+}
+function setLang(l){
+  LANG = l; try{ localStorage.setItem('ricard_lang', l); }catch(e){}
+  applyI18n();
+  if(qs('cardImg').style.display==='block') showCard();
+  if(qs('detail').style.display==='block'){ qs('detail').style.display='none'; showDetail(); }
+  if(qs('enImg').style.display==='block') showEn();
+}
 
 function localToday(){
   var d = new Date();
@@ -134,7 +171,7 @@ function showCard(){
     if(!b){ alert('生年月日を選んでください'); qs('me').focus(); return; }
     var t = qs('metime').value;  // "HH:MM" または ""
     try{ localStorage.setItem('ricard_birth', b); localStorage.setItem('ricard_time', t); localStorage.setItem('ricard_gender', qs('gender').value); }catch(e){}
-    var url = '/api/card?b=' + b + '&d=' + localToday();
+    var url = '/api/card?b=' + b + '&d=' + localToday() + '&lang=' + LANG;
     if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
     var img = qs('cardImg');
     img.style.opacity = '0.35';                 // 押すたびに一瞬光って「更新された」と分かる
@@ -163,7 +200,7 @@ function showEn(){
   img.style.opacity = '0.35';
   img.onload = function(){ img.style.opacity='1'; img.scrollIntoView({behavior:'smooth', block:'center'}); };
   img.onerror = function(){ img.style.opacity='1'; alert('縁カードの生成に失敗しました。'); };
-  img.src = '/api/en?a=' + a + '&b=' + b + '&_=' + Date.now();
+  img.src = '/api/en?a=' + a + '&b=' + b + '&lang=' + LANG + '&_=' + Date.now();
   img.style.display = 'block';
   qs('enBtns').classList.remove('hidden');
 }
@@ -206,7 +243,7 @@ function copyInvite(){
 }
 
 function renderDetail(j){
-  var html = '<div>占いの土台：' + j.methods + '</div><table>';
+  var html = '<div>' + ((I18N[LANG]||I18N.ja).detailbase) + j.methods + '</div><table>';
   for(var i=0;i<j.rows.length;i++){ html += '<tr><td class="k">'+j.rows[i][0]+'</td><td>'+j.rows[i][1]+'</td></tr>'; }
   html += '</table><div class="how">'+j.how+'</div><div class="note">'+j.note+'</div>';
   return html;
@@ -216,7 +253,7 @@ function showDetail(){
   var el = qs('detail');
   if(el.style.display === 'block'){ el.style.display='none'; return; }
   var t = qs('metime').value, g = qs('gender').value;
-  var url = '/api/detail?b=' + b + '&d=' + localToday();
+  var url = '/api/detail?b=' + b + '&d=' + localToday() + '&lang=' + LANG;
   if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
   if(g){ url += '&g=' + g; }
   fetch(url).then(function(r){ return r.json(); }).then(function(j){
@@ -228,6 +265,7 @@ function showDetail(){
 
 // 起動時：前回の生年月日を思い出して今日のカードを自動表示／招待リンク処理
 (function(){
+  applyI18n();
   var p = new URLSearchParams(location.search);
   // 前回入れた生年月日を復元（端末内に保存・サーバーには送らない）
   try{
@@ -273,6 +311,8 @@ def api_card():
     b = request.args.get("b", "")
     d = request.args.get("d", "")   # 閲覧者の端末ローカル日付（その人の"今日"）
     h = request.args.get("h", "")   # 生まれた時間（任意・0〜23時）
+    lang = request.args.get("lang", "ja")
+    lang = lang if lang in ("ja", "zh") else "ja"
     try:
         birth = _parse(b)
         if h != "":
@@ -283,19 +323,21 @@ def api_card():
         target = _parse(d) if d else _server_today()
     except Exception:
         target = _server_today()
-    return _png(render(build_card(birth, target), "morning"))
+    return _png(render(build_card(birth, target, lang), "morning", lang))
 
 
 @app.route("/api/en")
 def api_en():
     a = request.args.get("a", "")
     b = request.args.get("b", "")
+    lang = request.args.get("lang", "ja")
+    lang = lang if lang in ("ja", "zh") else "ja"
     try:
         A = _parse(a)
         B = _parse(b)
     except Exception:
         abort(400)
-    return _png(render_view(build_en(A, B), "morning"))
+    return _png(render_view(build_en(A, B, lang), "morning", lang))
 
 
 @app.route("/api/detail")
@@ -304,6 +346,8 @@ def api_detail():
     d = request.args.get("d", "")
     h = request.args.get("h", "")
     g = request.args.get("g", "")
+    lang = request.args.get("lang", "ja")
+    lang = lang if lang in ("ja", "zh") else "ja"
     try:
         birth = _parse(b)
         if h != "":
@@ -314,7 +358,7 @@ def api_detail():
         target = _parse(d) if d else _server_today()
     except Exception:
         target = _server_today()
-    return jsonify(build_detail(birth, target, g if g in ("m", "f") else None))
+    return jsonify(build_detail(birth, target, g if g in ("m", "f") else None, lang))
 
 
 if __name__ == "__main__":

@@ -219,22 +219,82 @@ def current_dayun(birth, gender_code, target_year, day_master):
     return None
 
 
-def build_detail(birth, date, gender=None):
-    """このカードが『何をもとに出ているか』を分かりやすく返す（誠実さの開示用）。"""
+_DETAIL_L = {
+    "ja": {
+        "methods": "四柱推命（生年月日からの命式）＋ 九星気学（方位）＋ 一神会『理』の考え方",
+        "labels": {"axis": "あなたの軸（日主）", "honmei": "本命星（九星）", "strength": "体質（身強・身弱）",
+                   "tgz": "今日の干支", "ttg": "今日の十神", "fit": "今日との相性", "ppl": "人との関係（地支）",
+                   "avoid": "今日 控えめにしたい向き（参考）", "liunian": "今年の運（流年）",
+                   "yojin": "あなたに合う五行（用神・簡易）", "dayun": "今の大運（10年の流れ）"},
+        "strong": "身強（エネルギー強め）", "weak": "身弱（エネルギー控えめ）",
+        "favorable": "追い風の日", "challenging": "控えめにいく日",
+        "gloss": {"比劫": "自立・仲間・勢い", "食傷": "出す・表現・才能", "財": "つかむ・縁・お金",
+                  "官殺": "律する・責任・抑え", "印": "受け取る・学び・支え"},
+        "brel": {"clash": "冲（動きやすい・変化）", "harmony": "合（和む・つながる）",
+                 "friction": "刑・害（小さな摩擦）", "calm": "穏やか"},
+        "avoidnames": {"五黄殺": "五黄殺", "暗剣殺": "暗剣殺", "日破": "日破", "本命殺": "本命殺", "本命的殺": "本命的殺"},
+        "none": "特になし", "dayunfmt": "%d〜%d歳：%s（%s）",
+        "note": "これは当てるためのものではなく、今日を整えるための目安です。断定はしません。",
+        "how": ("生年月日から四柱推命の命式（あなたの軸＝日主）を出し、"
+                "今日の干支との関係＝十神「%s」で今日のテーマを、"
+                "あなたの体質（身強・身弱）との相性で『追い風か控えめか』を、"
+                "今日とあなたの地支の関係で人との動きを読みます。"
+                "方位は、その日の九星の配置から、五黄殺・暗剣殺・日破と、"
+                "あなたの本命星の位置（本命殺）から『避けたい向き』を出しています。"
+                "良い向き（吉方）は流派で見方が分かれるため、定義の明確な避けたい向きだけを参考としています。"
+                "挙げた向き以外は、特に気にしすぎなくて大丈夫です。"
+                "さらに、今年の干支（流年）・あなたに合う五行（用神）・"
+                "（性別を入れると）今の10年期（大運）も併せて見ています。"),
+    },
+    "zh": {
+        "methods": "四柱推命（從生日推命盤）＋ 九星氣學（方位）＋ 一神會『理』的思維",
+        "labels": {"axis": "你的核心（日主）", "honmei": "本命星（九星）", "strength": "體質（身強・身弱）",
+                   "tgz": "今日干支", "ttg": "今日十神", "fit": "今日的相性", "ppl": "人際關係（地支）",
+                   "avoid": "今天 宜避開的方位（參考）", "liunian": "今年的運（流年）",
+                   "yojin": "適合你的五行（用神・簡易）", "dayun": "目前的大運（十年之流）"},
+        "strong": "身強（能量偏強）", "weak": "身弱（能量偏弱）",
+        "favorable": "順風的一天", "challenging": "宜收斂的一天",
+        "gloss": {"比劫": "自立・夥伴・氣勢", "食傷": "表達・展現・才華", "財": "把握・緣分・金錢",
+                  "官殺": "自律・責任・收斂", "印": "接收・學習・支持"},
+        "brel": {"clash": "冲（容易變動）", "harmony": "合（和緩・連結）",
+                 "friction": "刑・害（小摩擦）", "calm": "平穩"},
+        "avoidnames": {"五黄殺": "五黃殺", "暗剣殺": "暗劍殺", "日破": "日破", "本命殺": "本命殺", "本命的殺": "本命的殺"},
+        "none": "無特別", "dayunfmt": "%d〜%d歲：%s（%s）",
+        "note": "這並非用來算準，而是整理今天的參考，不作斷定。",
+        "how": ("從生日推出四柱命盤（你的核心＝日主），"
+                "用今日干支與你的關係＝十神「%s」看今天的主題，"
+                "用你的體質（身強・身弱）的相性看『順風或宜收斂』，"
+                "用今日與你的地支關係看人際的動向。"
+                "方位是從當日九星的配置，算出五黃殺・暗劍殺・日破，"
+                "與你的本命星所在（本命殺），得出『宜避開的方位』。"
+                "好的方位（吉方）各流派看法不同，故只提供定義明確的宜避開方位。"
+                "上述以外的方位，不必太在意。"
+                "此外也一併參看今年干支（流年）・適合你的五行（用神）・"
+                "（填入性別時）目前的十年期（大運）。"),
+    },
+}
+
+
+def build_detail(birth, date, gender=None, lang="ja"):
+    """このカードが『何をもとに出ているか』を分かりやすく返す（誠実さの開示用・二言語）。"""
+    L = _DETAIL_L.get(lang, _DETAIL_L["ja"])
+    lb = L["labels"]
     m = build_flow(birth, date)
     bc = birth_chart(*birth)
     dm = m["day_master"]
     dm_elem = bc["day_master_element"]
-    strength_jp = "身強（エネルギー強め）" if m["strength"] == "strong" else "身弱（エネルギー控えめ）"
-    favor_jp = "追い風の日" if m["favor"] == "favorable" else "控えめにいく日"
+    honmei = (m["honmei_star"].replace("緑", "綠").replace("黒", "黑")
+              if lang == "zh" else m["honmei_star"])
+    strength = L["strong"] if m["strength"] == "strong" else L["weak"]
+    favor = L["favorable"] if m["favor"] == "favorable" else L["challenging"]
     rows = [
-        ["あなたの軸（日主）", "%s（%s）" % (dm, dm_elem)],
-        ["本命星（九星）", m["honmei_star"]],
-        ["体質（身強・身弱）", strength_jp],
-        ["今日の干支", m["day_pillar"]],
-        ["今日の十神", "%s（%s）" % (m["ten_god"], _GROUP_GLOSS[m["group"]])],
-        ["今日との相性", favor_jp],
-        ["人との関係（地支）", _BREL_LABEL[m["branch_rel"]]],
+        [lb["axis"], "%s（%s）" % (dm, dm_elem)],
+        [lb["honmei"], honmei],
+        [lb["strength"], strength],
+        [lb["tgz"], m["day_pillar"]],
+        [lb["ttg"], "%s（%s）" % (m["ten_god"], L["gloss"][m["group"]])],
+        [lb["fit"], favor],
+        [lb["ppl"], L["brel"][m["branch_rel"]]],
     ]
     dinfo = build_direction(date, bc["honmei_star_num"])
     grouped, order = {}, []
@@ -242,35 +302,16 @@ def build_detail(birth, date, gender=None):
         if d not in grouped:
             grouped[d] = []
             order.append(d)
-        grouped[d].append(lbl)
-    avoid_str = "・".join("%s（%s）" % (d, "・".join(grouped[d])) for d in order) or "特になし"
-    rows.append(["今日 控えめにしたい向き（参考）", avoid_str])
-    # 流年（今年の運）
+        grouped[d].append(L["avoidnames"].get(lbl, lbl))
+    avoid_str = "・".join("%s（%s）" % (d, "・".join(grouped[d])) for d in order) or L["none"]
+    rows.append([lb["avoid"], avoid_str])
     ly_gz, _ly_tg, ly_grp = build_liunian(date, dm)
-    rows.append(["今年の運（流年）", "%s（%s）" % (ly_gz, _GROUP_GLOSS[ly_grp])])
-    # 用神（合う五行・簡易）
+    rows.append([lb["liunian"], "%s（%s）" % (ly_gz, L["gloss"][ly_grp])])
     yojin = build_yojin(dm_elem, m["strength"])
-    rows.append(["あなたに合う五行（用神・簡易）", "・".join(yojin)])
-    # 大運（10年の流れ）※性別が必要
+    rows.append([lb["yojin"], "・".join(yojin)])
     if gender in ("m", "f"):
         du = current_dayun(birth, 0 if gender == "m" else 1, int(date[0]), dm)
         if du and du.get("ganzhi"):
-            rows.append(["今の大運（10年の流れ）",
-                         "%d〜%d歳：%s（%s）" % (du["age"][0], du["age"][1],
-                                               du["ganzhi"], _GROUP_GLOSS[du["group"]])])
-    how = ("生年月日から四柱推命の命式（あなたの軸＝日主）を出し、"
-           "今日の干支との関係＝十神「%s」で今日のテーマを、"
-           "あなたの体質（身強・身弱）との相性で『追い風か控えめか』を、"
-           "今日とあなたの地支の関係で人との動きを読みます。"
-           "方位は、その日の九星の配置から、五黄殺・暗剣殺・日破と、"
-           "あなたの本命星の位置（本命殺）から『避けたい向き』を出しています。"
-           "良い向き（吉方）は流派で見方が分かれるため、定義の明確な避けたい向きだけを参考としています。"
-           "挙げた向き以外は、特に気にしすぎなくて大丈夫です。"
-           "さらに、今年の干支（流年）・あなたに合う五行（用神）・"
-           "（性別を入れると）今の10年期（大運）も併せて見ています。" % m["ten_god"])
-    return {
-        "methods": "四柱推命（生年月日からの命式）＋ 九星気学（方位）＋ 一神会『理』の考え方",
-        "rows": rows,
-        "how": how,
-        "note": "これは当てるためのものではなく、今日を整えるための目安です。断定はしません。",
-    }
+            rows.append([lb["dayun"], L["dayunfmt"] % (du["age"][0], du["age"][1],
+                                                       du["ganzhi"], L["gloss"][du["group"]])])
+    return {"methods": L["methods"], "rows": rows, "how": L["how"] % m["ten_god"], "note": L["note"]}

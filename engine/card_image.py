@@ -12,6 +12,7 @@ from .voice import build_card
 FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fonts")
 F_SERIF = os.path.join(FONT_DIR, "ShipporiMincho-Regular.ttf")
 F_SERIF_DB = os.path.join(FONT_DIR, "ShipporiMincho-Bold.ttf")
+F_TC = os.path.join(FONT_DIR, "NotoSerifTC.ttf")  # 繁體中文用（OFL）
 
 W, H = 1080, 1440
 MARGIN = 110
@@ -101,21 +102,23 @@ def _left_block(draw, x, y, text, font, fill, maxw, leading):
     return y
 
 
-def render_view(view, style_name="morning"):
+def render_view(view, style_name="morning", lang="ja"):
     st = STYLES[style_name]
     base = _vgrad(st["bg_top"], st["bg_bottom"]).convert("RGBA")
     if st["motif"]:
         base = _motif(base, st["motif"], st)
     draw = ImageDraw.Draw(base)
 
-    f_title = _font(F_SERIF, 30)
-    f_date = _font(F_SERIF, 26)
-    f_open = _font(F_SERIF_DB, 60)
-    f_label = _font(F_SERIF_DB, 27)
-    f_body = _font(F_SERIF, 37)
-    f_close = _font(F_SERIF, 38)
-    f_foot = _font(F_SERIF, 20)
-    f_mark = _font(F_SERIF, 25)
+    serif = F_TC if lang == "zh" else F_SERIF
+    serif_db = F_TC if lang == "zh" else F_SERIF_DB
+    f_title = _font(serif, 30)
+    f_date = _font(serif, 26)
+    f_open = _font(serif_db, 60)
+    f_label = _font(serif_db, 27)
+    f_body = _font(serif, 37)
+    f_close = _font(serif, 38)
+    f_foot = _font(serif, 20)
+    f_mark = _font(serif, 25)
 
     # 見出し「今日の理」＋日付
     y = 96
@@ -152,33 +155,43 @@ def render_view(view, style_name="morning"):
         w = draw.textlength(line, font=f_foot)
         draw.text(((W - w) / 2, fy), line, font=f_foot, fill=st["footer"])
         fy += 28
-    mark = "理 カ ー ド"
+    mark = view.get("mark", "理 カ ー ド")
     w = draw.textlength(mark, font=f_mark)
     draw.text(((W - w) / 2, H - 56), mark, font=f_mark, fill=st["label"])
 
     return base.convert("RGB")
 
 
-def daily_view(card):
-    """個人の『今日の理』カードを描画用ビューに変換。"""
+_DAILY_L = {
+    "ja": {"subtitle": "今 日 の 理", "mark": "理 カ ー ド",
+           "labels": ["流れ", "縁・人", "動き", "整える"]},
+    "zh": {"subtitle": "今 日 之 理", "mark": "理 卡",
+           "labels": ["流動", "緣分", "行動", "整理"]},
+}
+
+
+def daily_view(card, lang="ja"):
+    """個人の『今日の理』カードを描画用ビューに変換（lang で言語切替）。"""
+    L = _DAILY_L.get(lang, _DAILY_L["ja"])
     return {
-        "subtitle": "今 日 の 理",
+        "subtitle": L["subtitle"],
         "date": card["date"],
         "opening": card["opening"],
         "sections": [
-            ("流れ", card["flow"]),
-            ("縁・人", card["en_hito"]),
-            ("動き", card["ugoki"]),
-            ("整える", card["totonoe"]),
+            (L["labels"][0], card["flow"]),
+            (L["labels"][1], card["en_hito"]),
+            (L["labels"][2], card["ugoki"]),
+            (L["labels"][3], card["totonoe"]),
         ],
         "closing": card["closing"],
+        "mark": L["mark"],
         "footer": card["footer"],
     }
 
 
-def render(card, style_name="morning"):
+def render(card, style_name="morning", lang="ja"):
     """個人カードを描画（互換ラッパー）。"""
-    return render_view(daily_view(card), style_name)
+    return render_view(daily_view(card, lang), style_name, lang)
 
 
 def generate(birth, date, outdir, styles=None):
