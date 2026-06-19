@@ -46,7 +46,7 @@ PAGE = """<!doctype html>
   .card{ background:#fffdf8; border:1px solid var(--line); border-radius:16px; padding:22px 20px; margin:0 0 22px; }
   .card h2{ font-size:18px; font-weight:500; margin:0 0 14px; letter-spacing:.12em; }
   label{ display:block; font-size:13px; color:var(--sub); margin:10px 0 4px; }
-  input[type=date]{ width:100%; padding:12px 14px; font-size:16px; border:1px solid var(--line);
+  input[type=date], input[type=time], input[type=text]{ width:100%; padding:12px 14px; font-size:16px; border:1px solid var(--line);
         border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; }
   button{ width:100%; margin-top:16px; padding:13px; font-size:16px; font-family:inherit;
         color:#fff; background:var(--ink); border:none; border-radius:10px; letter-spacing:.1em; cursor:pointer; }
@@ -112,23 +112,39 @@ function localToday(){
   return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
 }
 function showCard(){
-  var b = qs('me').value;
-  if(!b){ alert('生年月日を選んでください'); return; }
-  var t = qs('metime').value;  // "HH:MM" または ""
-  try{ localStorage.setItem('ricard_birth', b); localStorage.setItem('ricard_time', t); }catch(e){}
-  var url = '/api/card?b=' + b + '&d=' + localToday();
-  if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
-  var img = qs('cardImg');
-  img.src = url + '&_=' + Date.now();
-  img.style.display = 'block';
-  qs('cardBtns').classList.remove('hidden');
-  if(!qs('enA').value) qs('enA').value = b;
+  try{
+    var b = qs('me').value;
+    if(!b){ alert('生年月日を選んでください'); qs('me').focus(); return; }
+    var t = qs('metime').value;  // "HH:MM" または ""
+    try{ localStorage.setItem('ricard_birth', b); localStorage.setItem('ricard_time', t); }catch(e){}
+    var url = '/api/card?b=' + b + '&d=' + localToday();
+    if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
+    var img = qs('cardImg');
+    img.style.opacity = '0.35';                 // 押すたびに一瞬光って「更新された」と分かる
+    img.onload = function(){
+      img.style.opacity = '1';
+      img.scrollIntoView({behavior:'smooth', block:'center'});  // 必ずカードまで移動
+    };
+    img.onerror = function(){
+      img.style.opacity = '1';
+      alert('カードの生成に失敗しました。もう一度お試しください。');
+    };
+    img.src = url + '&_=' + Date.now();
+    img.style.display = 'block';
+    qs('cardBtns').classList.remove('hidden');
+    if(!qs('enA').value) qs('enA').value = b;
+  }catch(err){
+    alert('エラー: ' + (err && err.message ? err.message : err));
+  }
 }
 
 function showEn(){
   var a = qs('enA').value, b = qs('enB').value;
   if(!a || !b){ alert('二人の生年月日を選んでください'); return; }
   var img = qs('enImg');
+  img.style.opacity = '0.35';
+  img.onload = function(){ img.style.opacity='1'; img.scrollIntoView({behavior:'smooth', block:'center'}); };
+  img.onerror = function(){ img.style.opacity='1'; alert('縁カードの生成に失敗しました。'); };
   img.src = '/api/en?a=' + a + '&b=' + b + '&_=' + Date.now();
   img.style.display = 'block';
   qs('enBtns').classList.remove('hidden');
