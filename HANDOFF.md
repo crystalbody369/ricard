@@ -30,7 +30,11 @@ HIROの理（土台＋知識ベース1022件）でAIが **当てずに両面で*
 - `engine/auth.py` … 招待コード・利用者・課金。pbkdf2/5回ロック/期限/即停止、
   `register_with_code` `verify` `get_balance` `consume_consult` `add_credits`
   `reset_password` `set_enabled` `extend_days` 等。
-- `engine/ri_seed.json` … 1022件の脱識別化した理データ（取り込み元）。
+- `engine/ri_seed.json` … 基本データ（取り込み元）。**2026-06-19にHIRO作成の構造化DBへ全面差し替え＝1098件**
+  （現象別1022＋外部伝承81、重複除外）。各エントリ: title/body(理による読み→推奨対応)/tags(現象・キーワード)/
+  strength(A立ち止まる・B状況で・C参考)/ptype(判断型)/cat(大分類)/note(注意点)。版は `engine/ri_seed.version`。
+  旧データは `engine/ri_seed_OLD_1022.json.bak`（gitignore）。元Excel: `C:\Users\User\Downloads\理の判断データベース_外部伝承拡張版_v1.xlsx`。
+  ※基本データを更新するときは Excel→変換スクリプトで ri_seed.json + version を作り直し、管理画面の「入れ替え」ボタンで反映。
 - `fonts/` … Shippori Mincho / Noto Serif TC。
 
 ## Render 環境変数（HIROが設定・Claudeからは見えない）
