@@ -703,10 +703,10 @@ for(var i=0;i<ps.length;i++){(function(inp){
  b.onclick=function(){if(inp.type==='password'){inp.type='text';b.textContent='🙈';}
   else{inp.type='password';b.textContent='👁';}};
  w.appendChild(b);})(ps[i]);}})();
-window.filterKB=function(){
- var inp=document.getElementById('kbsearch'); if(!inp) return;
+window.filterList=function(inpId,tableId,countId){
+ var inp=document.getElementById(inpId); if(!inp) return;
  var q=inp.value.trim();
- var rows=document.querySelectorAll('#kbtable tr'); var n=0;
+ var rows=document.querySelectorAll('#'+tableId+' tr'); var n=0;
  for(var k=0;k<rows.length;k++){
   if(!rows[k].hasAttribute('data-s')) continue;
   var s=rows[k].getAttribute('data-s');
@@ -714,8 +714,9 @@ window.filterKB=function(){
   rows[k].style.display=show?'':'none';
   if(show) n++;
  }
- var c=document.getElementById('kbcount'); if(c) c.textContent=n;
+ var c=document.getElementById(countId); if(c) c.textContent=n;
 };
+window.filterKB=function(){window.filterList('kbsearch','kbtable','kbcount');};
 window.toggleFull=function(td){
  var s=td.querySelector('.snip'), f=td.querySelector('.full');
  if(!f) return;
@@ -724,12 +725,19 @@ window.toggleFull=function(td){
  if(s) s.style.display=open?'none':'block';
 };
 (function(){
- var box=document.getElementById('kbbox'); if(!box) return;
- var over=false;
- box.addEventListener('mouseenter',function(){over=true;});
- box.addEventListener('mouseleave',function(){over=false;});
+ var boxes=document.querySelectorAll('.scrollbox'); if(!boxes.length) return;
+ for(var i=0;i<boxes.length;i++){(function(box){
+  box.addEventListener('mouseenter',function(){box.setAttribute('data-over','1');});
+  box.addEventListener('mouseleave',function(){box.removeAttribute('data-over');});
+ })(boxes[i]);}
  document.addEventListener('keydown',function(e){
-  if(!(over||document.activeElement===box)) return;
+  var tag=(e.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='textarea') return;
+  var box=null, all=document.querySelectorAll('.scrollbox');
+  for(var i=0;i<all.length;i++){
+   if(all[i].getAttribute('data-over')==='1'||document.activeElement===all[i]){box=all[i];break;}
+  }
+  if(!box) return;
   var step=44;
   if(e.key==='ArrowDown'){box.scrollTop+=step;e.preventDefault();}
   else if(e.key==='ArrowUp'){box.scrollTop-=step;e.preventDefault();}
@@ -885,25 +893,30 @@ def admin():
 
     # 紹介コード表
     crows = ""
+    ccount = 0
     for c in auth.list_codes():
+        ccount += 1
         uses = ("%d / %s" % (c["used_count"], "∞" if not c["max_uses"] else c["max_uses"]))
         gd = ("%d日" % c["grant_days"]) if c["grant_days"] is not None else "無期限"
         gf = ("無料%d回" % c["grant_free"]) if c.get("grant_free") is not None else "無料既定"
         gd = gd + "・" + gf
         to = "off" if c["enabled"] else "on"
-        crows += ("<tr><td><b>%s</b></td><td>%s</td><td>%s</td><td>付与%s</td>"
+        srch_c = escape(c["code"] + " " + c["状態"] + " " + gd)
+        crows += ("<tr data-s=\"%s\"><td><b>%s</b></td><td>%s</td><td>%s</td><td>付与%s</td>"
                   "<td><form method='post' style='display:inline'><input type='hidden' name='action' value='code_toggle'>"
                   "<input type='hidden' name='code' value='%s'><input type='hidden' name='to' value='%s'>"
                   "<button class='mini ghost'>%s</button></form>"
                   "<form method='post' style='display:inline' onsubmit=\"return confirm('削除しますか？')\">"
                   "<input type='hidden' name='action' value='code_delete'><input type='hidden' name='code' value='%s'>"
                   "<button class='mini ghost'>削除</button></form></td></tr>") % (
-            escape(c["code"]), escape(c["状態"]), uses, gd,
+            srch_c, escape(c["code"]), escape(c["状態"]), uses, gd,
             escape(c["code"]), to, ("停止" if c["enabled"] else "再開"), escape(c["code"]))
 
     # 利用者表
     urows = ""
+    ucount = 0
     for u in auth.list_users():
+        ucount += 1
         to = "off" if u["enabled"] else "on"
         admin_tag = " 👑" if u["is_admin"] else ""
         if u["is_admin"]:
@@ -930,8 +943,9 @@ def admin():
                 escape(u["username"]), to, ("停止" if u["enabled"] else "再開"),
                 escape(u["username"]), PACK_CREDITS,
                 escape(u["username"]), escape(u["username"]), escape(u["username"]))
-        urows += "<tr><td><b>%s</b>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
-            escape(u["username"]), admin_tag, escape(u["状態"]), escape(str(u["expires_on"])),
+        srch_u = escape(u["username"] + " " + u["状態"] + " " + bal_txt + " " + str(u["expires_on"]))
+        urows += "<tr data-s=\"%s\"><td><b>%s</b>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+            srch_u, escape(u["username"]), admin_tag, escape(u["状態"]), escape(str(u["expires_on"])),
             escape(bal_txt), acts)
 
     ri_extra = escape(store.get_setting("ri_extra", "") or "")
@@ -975,7 +989,11 @@ def admin():
 <p class="note"><a href="https://dashboard.stripe.com/" target="_blank" rel="noopener" style="color:var(--gold)">▶ 売上を確認（Stripeダッシュボード）</a> ・ <a href="/logout">ログアウト</a></p></div>
 
 <div class="card"><h2>紹介コード</h2>
-<table><tr><th>コード</th><th>状態</th><th>登録人数</th><th>付与・無料</th><th></th></tr>{crows}</table>
+<input type="text" id="codesearch" oninput="filterList('codesearch','codetable','codecount')" placeholder="コードを検索（TEST / RICARD / 有効 など）">
+<div class="note" style="margin:2px">表示中 <span id="codecount">{ccount}</span> 件。枠内にマウスを合わせると↑↓キーでも動きます。</div>
+<div id="codebox" class="scrollbox" tabindex="0" style="max-height:300px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px; outline:none;">
+<table id="codetable"><tr><th>コード</th><th>状態</th><th>登録人数</th><th>付与・無料</th><th></th></tr>{crows}</table>
+</div>
 <form method="post" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
 <input type="hidden" name="action" value="code_create">
 <label>新しいコード（例：RICARD2026）</label><input type="text" name="code">
@@ -986,7 +1004,11 @@ def admin():
 <button type="submit">コードを発行</button></form></div>
 
 <div class="card"><h2>利用者</h2>
-<table><tr><th>ユーザー</th><th>状態</th><th>期限</th><th>残数</th><th></th></tr>{urows}</table></div>
+<input type="text" id="usersearch" oninput="filterList('usersearch','usertable','usercount')" placeholder="利用者を検索（名前 / 有効 / 停止 など）">
+<div class="note" style="margin:2px">表示中 <span id="usercount">{ucount}</span> 件。枠内にマウスを合わせると↑↓キー・PageUp/Down でも動きます。</div>
+<div id="userbox" class="scrollbox" tabindex="0" style="max-height:380px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px; outline:none;">
+<table id="usertable"><tr><th>ユーザー</th><th>状態</th><th>期限</th><th>残数</th><th></th></tr>{urows}</table>
+</div></div>
 
 <div class="card"><h2>理の追記（AIに教える理）</h2>
 <p class="note">ここに書いた理を、AIが<b>全ユーザーの相談</b>で参考にして答えます。※名前・団体名は書かないでください（普遍的な原則のみ）。長いほど1回のコストが上がるので、要点を絞るのがおすすめです。</p>
@@ -1007,12 +1029,13 @@ def admin():
 <div class="note" style="margin-top:18px;border-top:1px solid var(--line);padding-top:12px">▼ 登録済みの理（一覧・検索）— 表示中 <span id="kbcount">{dcount}</span> 件</div>
 <input type="text" id="kbsearch" oninput="filterKB()" placeholder="理を検索（お金 / 縁 / 焦り / 言葉 など）">
 <div class="note" style="margin:2px">行をクリックすると全文が開きます。枠内にマウスを合わせると↑↓キー・PageUp/Down でも動きます。</div>
-<div id="kbbox" tabindex="0" style="max-height:380px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px; outline:none;">
+<div id="kbbox" class="scrollbox" tabindex="0" style="max-height:380px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:0 10px; outline:none;">
 <table id="kbtable"><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
 </div></div>""".format(
         user=escape(me["username"]), msg=mb, spent=int(spent),
         crows=crows or "<tr><td colspan='5' class='note'>まだありません</td></tr>",
         urows=urows, ri_extra=ri_extra, dcount=dcount, drows=drows,
+        ccount=ccount, ucount=ucount,
         import_block=import_block)
     return _shell("管理者", body)
 
