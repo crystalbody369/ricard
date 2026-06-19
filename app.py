@@ -598,6 +598,19 @@ for(var i=0;i<ps.length;i++){(function(inp){
  b.onclick=function(){if(inp.type==='password'){inp.type='text';b.textContent='🙈';}
   else{inp.type='password';b.textContent='👁';}};
  w.appendChild(b);})(ps[i]);}})();
+window.filterKB=function(){
+ var inp=document.getElementById('kbsearch'); if(!inp) return;
+ var q=inp.value.trim();
+ var rows=document.querySelectorAll('#kbtable tr'); var n=0;
+ for(var k=0;k<rows.length;k++){
+  if(!rows[k].hasAttribute('data-s')) continue;
+  var s=rows[k].getAttribute('data-s');
+  var show=(!q)||(s.indexOf(q)>=0);
+  rows[k].style.display=show?'':'none';
+  if(show) n++;
+ }
+ var c=document.getElementById('kbcount'); if(c) c.textContent=n;
+};
 </script>
 </div></body></html>""",
                     mimetype="text/html")
@@ -780,12 +793,12 @@ def admin():
     drows = ""
     for d in store.list_ri_docs():
         snip = (d["body"][:44] + "…") if len(d["body"]) > 44 else d["body"]
-        drows += ("<tr><td><b>%s</b><br><span class='note'>%s</span></td><td>%s</td>"
+        drows += ("<tr data-s=\"%s\"><td><b>%s</b><br><span class='note'>%s</span></td><td>%s</td>"
                   "<td><form method='post' style='display:inline' onsubmit=\"return confirm('削除しますか？')\">"
                   "<input type='hidden' name='action' value='ridoc_delete'>"
                   "<input type='hidden' name='doc_id' value='%s'>"
                   "<button class='mini ghost'>削除</button></form></td></tr>") % (
-            escape(d["title"]), escape(snip), d["created_at"], d["id"])
+            escape(d["title"] + d["body"]), escape(d["title"]), escape(snip), d["created_at"], d["id"])
     drows = drows or "<tr><td colspan='3' class='note'>まだありません</td></tr>"
 
     body = """<h1>管理者画面</h1><p class="tag">理カード・オーナー専用（{user}）</p>
@@ -819,7 +832,9 @@ def admin():
 <form method="post" style="margin:0 0 12px"><input type="hidden" name="action" value="ri_import">
 <button type="submit" class="ghost">同梱の理データ（{seedn}件）をまとめて取り込む</button>
 <span class="note">　※あなたの記録・著作から作った理。重複は自動で飛ばします。</span></form>
-<table><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
+<input type="text" id="kbsearch" oninput="filterKB()" placeholder="理を検索（お金 / 縁 / 焦り / 言葉 など）">
+<div class="note" style="margin:4px 2px">表示中 <span id="kbcount">{dcount}</span> 件</div>
+<table id="kbtable"><tr><th>理（タイトル／抜粋）</th><th>追加日</th><th></th></tr>{drows}</table>
 <form method="post" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
 <input type="hidden" name="action" value="ridoc_add">
 <label>タイトル（例：落ちたお金の理）</label><input type="text" name="doc_title">
