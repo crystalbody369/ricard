@@ -66,8 +66,7 @@ def compose(m):
     """build_flow の素材 → 整った『今日の理』カード。"""
     g, fav, brel, seed = m["group"], m["favor"], m["branch_rel"], m["seed"]
     prefix = "急がず、" if brel == "clash" else ""
-    ugoki = "%sもし動くなら、%sに。今日は%sの方が、少し気が通ります。" % (
-        prefix, m["timing"], m["direction"])
+    ugoki = "%sもし動くなら、%sが落ち着きます。" % (prefix, m["timing"])
 
     return {
         "date": m["date"],
