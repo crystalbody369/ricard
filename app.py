@@ -950,11 +950,11 @@ def admin():
 <p class="note">本日のAI利用：約 ¥{spent} / 上限の蓋つき。<a href="/logout">ログアウト</a></p></div>
 
 <div class="card"><h2>紹介コード</h2>
-<table><tr><th>コード</th><th>状態</th><th>使用</th><th>付与期限</th><th></th></tr>{crows}</table>
+<table><tr><th>コード</th><th>状態</th><th>登録人数</th><th>付与・無料</th><th></th></tr>{crows}</table>
 <form method="post" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
 <input type="hidden" name="action" value="code_create">
 <label>新しいコード（例：RICARD2026）</label><input type="text" name="code">
-<div class="row"><div style="flex:1"><label>使用上限（0=無制限）</label><input type="number" name="max_uses" value="0" min="0" step="1"></div>
+<div class="row"><div style="flex:1"><label>登録できる人数（0=無制限）</label><input type="number" name="max_uses" value="0" min="0" step="1"></div>
 <div style="flex:1"><label>付与する利用日数（空=無期限）</label><input type="number" name="grant_days" min="1" step="1" placeholder="空=無期限"></div></div>
 <label>無料お試し回数（空＝既定の3回）</label><input type="number" name="grant_free" min="0" step="1" placeholder="空=既定3">
 <label>メモ（任意）</label><input type="text" name="note">
