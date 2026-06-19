@@ -154,6 +154,17 @@ PAGE = """<!doctype html>
            border-radius:999px; background:#fffaf0; color:var(--ink); cursor:pointer; font-family:inherit;
            width:auto; margin:0; transition:background .15s; }
   .exchip:hover{ background:#f6edda; border-color:var(--gold); }
+  .exmodal{ position:fixed; inset:0; background:rgba(40,30,15,.45); z-index:50; display:flex;
+            align-items:center; justify-content:center; padding:16px; }
+  .exbox{ background:#fffdf8; border:1px solid var(--line); border-radius:14px; max-width:520px; width:100%;
+          max-height:85vh; overflow-y:auto; padding:22px 20px 20px; position:relative; text-align:left; }
+  .exclose{ position:absolute; top:8px; right:10px; width:auto; margin:0; padding:4px 10px; font-size:22px;
+            line-height:1; background:none; border:none; color:var(--sub); cursor:pointer; }
+  .exfree{ font-size:12.5px; color:var(--gold); background:#fbf3df; border-radius:8px; padding:8px 10px; margin:4px 0 14px; }
+  .exlbl{ font-size:12.5px; color:var(--sub); margin:14px 0 4px; font-weight:600; }
+  .extext{ font-size:14px; line-height:1.85; color:var(--ink); background:#fff; border:1px solid var(--line);
+           border-radius:10px; padding:11px 13px; white-space:pre-wrap; }
+  .exans{ background:#fbf7ee; }
   .ccount{ font-size:12px; color:var(--sub); text-align:right; margin:6px 2px 0; }
   .ccount #cremain{ color:var(--gold); }
   .card h2{ display:flex; align-items:center; }
@@ -213,11 +224,24 @@ PAGE = """<!doctype html>
     <h2 data-i18n="h2consult">理に相談する</h2>
     <p class="note" style="text-align:left; margin:0 0 10px" data-i18n="consultlead">気になった出来事を書くと、理の視点で静かに観ます。当てるのではなく、整えるために。</p>
     <div id="cexamples" style="margin:0 0 10px">
-      <p class="note" style="text-align:left;margin:0 0 6px" data-i18n="cexlead">はじめての方へ — どう書けばいい？ タップすると例文が入ります：</p>
+      <p class="note" style="text-align:left;margin:0 0 6px" data-i18n="cexlead">はじめての方へ — どう書けばいい？ 見本を見る（無料・相談は消費しません）：</p>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
-        <button type="button" class="exchip" onclick="useExample(0)"></button>
-        <button type="button" class="exchip" onclick="useExample(1)"></button>
-        <button type="button" class="exchip" onclick="useExample(2)"></button>
+        <button type="button" class="exchip" onclick="showExample(0)"></button>
+        <button type="button" class="exchip" onclick="showExample(1)"></button>
+        <button type="button" class="exchip" onclick="showExample(2)"></button>
+      </div>
+    </div>
+    <div id="exmodal" class="exmodal" style="display:none" onclick="if(event.target===this)closeExample()">
+      <div class="exbox">
+        <button type="button" class="exclose" onclick="closeExample()" aria-label="close">×</button>
+        <p class="exfree" data-i18n="exfree">これは「書き方の見本」です。表示しても無料回数は減りません。</p>
+        <div class="exlbl" data-i18n="exlblev">こう書きます（気になった出来事）</div>
+        <div id="exev" class="extext"></div>
+        <div class="exlbl" data-i18n="exlblsit">こう書きます（今の気持ち・状況）</div>
+        <div id="exsit" class="extext"></div>
+        <div class="exlbl" data-i18n="exlblans">こう観てもらえます（回答の一例）</div>
+        <div id="exans" class="extext exans"></div>
+        <button type="button" id="exuse" onclick="useExample()" data-i18n="exuse">この例を入力欄に入れて、自分で書き換える</button>
       </div>
     </div>
     <textarea id="cevent" maxlength="500" rows="3" data-ph="cplaceholder" oninput="qs('cchars').textContent=this.value.length" placeholder="例：道に鳥が死んでいた。朝、大きな雲を見た。古い友人に偶然会った。"></textarea>
@@ -250,7 +274,10 @@ var I18N = {
        btnconsult:'理に観てもらう', consultprivacy:'※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。',
        csitlabel:'今の気持ち・状況・取り組んでいること（任意）', csitph:'例：新しい仕事を始めたばかりで不安。いろいろ手を広げて落ち着かない。',
        csithint:'※気持ちや状況も書くほど、あなたに合った観方になります。', btnbuy:'クレジットを購入（30回 ¥500）',
-       cexlead:'はじめての方へ — どう書けばいい？ タップすると例文が入ります：',
+       cexlead:'はじめての方へ — どう書けばいい？ 見本を見る（無料・相談は消費しません）：',
+       exfree:'これは「書き方の見本」です。表示しても無料回数は減りません。',
+       exlblev:'こう書きます（気になった出来事）', exlblsit:'こう書きます（今の気持ち・状況）',
+       exlblans:'こう観てもらえます（回答の一例）', exuse:'この例を入力欄に入れて、自分で書き換える',
        paidthanks:'ご購入ありがとうございます。回数が追加されました。',
        remain:'残り{n}回', consultempty:'出来事を書いてください。', consultlimit:'今日の無料分（3回）は終わりました。また明日どうぞ。',
        consultwait:'理で観ています…', consultfail:'うまく言葉にできませんでした。少し時間をおいて、もう一度お試しください。',
@@ -267,7 +294,10 @@ var I18N = {
        btnconsult:'請理為我觀照', consultprivacy:'※輸入的文字會送往AI（Claude）以產生回應，不會保存文字。',
        csitlabel:'此刻的心情・處境・正在投入的事（可選）', csitph:'例如：剛開始新工作很不安，手伸得太廣靜不下來。',
        csithint:'※越是寫下心情與處境，越能得到貼近你的觀照。', btnbuy:'購買點數（30次 ¥500）',
-       cexlead:'第一次使用嗎 — 該怎麼寫？ 點一下就會帶入範例：',
+       cexlead:'第一次使用嗎 — 該怎麼寫？ 看範例（免費・不會消耗諮詢次數）：',
+       exfree:'這是「書寫範例」。開啟查看不會減少免費次數。',
+       exlblev:'這樣寫（在意的事）', exlblsit:'這樣寫（此刻的心情・處境）',
+       exlblans:'會這樣被觀照（回應的一例）', exuse:'把這個範例帶入輸入欄，再自行修改',
        paidthanks:'感謝您的購買，次數已增加。',
        remain:'剩餘{n}次', consultempty:'請先寫下事情。', consultlimit:'今天的免費次數（3次）已用完，明天再來。',
        consultwait:'正以理觀照中…', consultfail:'這次沒能好好回應。請稍後再試一次。',
@@ -277,37 +307,55 @@ var I18N = {
 // 相談の参考例（タップで入力欄に入る）。chip=ボタンに出す短い見出し。
 var CEX = {
   ja: [
-    {chip:'🩹 物が壊れた・ほどけた',
-     ev:'家を出ようとした直前に、お気に入りの腕時計のベルトが切れた。',
-     sit:'最近うまく進まないことが続いていて、少し疲れている。何か見直すことがあるのか気になっている。'},
-    {chip:'🤝 偶然の再会・連絡',
-     ev:'しばらく連絡のなかった知り合いから、ふと連絡が来た。',
-     sit:'その人との関係を続けるか、少し距離を置くか迷っている。この巡り合わせに意味があるのか知りたい。'},
-    {chip:'🔁 小さなことが重なった',
-     ev:'大事な決断をしようとした日に、立て続けに小さなトラブルが続いた。',
-     sit:'今このまま進めるべきか、一度立ち止まるべきか迷っている。'}
+    {chip:'🛑 直前にトラブルで止まった',
+     ev:'大事なメールを送ろうとした直前に、パソコンが急に固まって動かなくなりました。最初は腹が立ちましたが、再起動してもう一度メールを見直したところ、宛先を一人間違えていたことに気づきました。もしそのまま送っていたら、かなり失礼なことになっていたと思います。',
+     sit:'最近、仕事を早く進めようとして少し焦っています。細かい確認を後回しにして、とにかく先に送ってしまおうという気持ちがありました。この出来事は、単なる機械トラブルとして流してよいのか、それとも理として何か見直すべきことがあるのか知りたいです。',
+     ans:'焦って「先に送ろう」とする気持ちが、確かめる目を薄くしていた。そこへ強制的に止められ、もう一度見る間ができた――そんな流れに見えます。一歩早く送るより、一手確かめてから送るほうが、結局は早いことがあります。送る前に三秒だけ止まる、その小さな間を意識してみては。意味は流してもよいですが、焦りだけはそっと受け取っておいてください。'},
+    {chip:'🤝 物の不調と縁が重なった',
+     ev:'人と会う約束をして出かけようとしたら、家を出る直前にお気に入りの腕時計のベルトが切れました。そのあと相手から連絡が来て、急に予定を変更したいと言われました。少し嫌な気持ちになりましたが、よく考えると最近その人との関係に無理を感じていて、自分も本当は少し疲れていました。',
+     sit:'相手との関係を続けた方がいいのか、少し距離を置いた方がいいのか迷っています。時計のベルトが切れたことと、予定変更が重なったので、何か意味があるのか気になっています。',
+     ans:'時計は時を刻むもの、ベルトは繋ぎとめるもの。それが切れたのは「この繋がりを今のまま続けるか、一度結び直すか」を問いかける見立てとも観られます。ただ大事なのは出来事より、あなたがすでに「無理を感じ、疲れていた」と気づいていたこと。続けるか離れるかより先に、自分が何に無理しているかを書き出してみては。相手の気持ちは推測せず、まず自分の状態を。'},
+    {chip:'🔁 小さなことが続いた',
+     ev:'朝、家を出るときに靴ひもがほどけました。そのあとコンビニで買おうと思っていた飲み物が売り切れていました。さらに信号に何度か引っかかりました。特に大きな不安はありませんが、最近こういう小さなことにも何か意味があるのではないかと考えてしまいます。',
+     sit:'今は少し神経質になっていて、何でも理の知らせではないかと思ってしまうところがあります。このような小さな出来事も全部意味を読んだ方がいいのでしょうか。それとも流してよいのでしょうか。',
+     ans:'靴ひも・売り切れ・信号――それぞれは独立した、ごく普通の出来事です。「特に不安はない」と感じているのが大事なところ。感じなかった出来事に意味を探すと、消耗するだけでかえって何も見えなくなります。今は「意味を見つける力」より「意味を手放す判断」かもしれません。この三つは、流してよいと思います。'}
   ],
   zh: [
-    {chip:'🩹 東西壞了・斷了',
-     ev:'正要出門前，心愛的手錶錶帶突然斷了。',
-     sit:'最近諸事不太順、有點累。想知道是不是有什麼該重新檢視的。'},
-    {chip:'🤝 偶然重逢・來訊',
-     ev:'許久沒聯絡的人，忽然傳來訊息。',
-     sit:'在猶豫要繼續這段關係，還是稍微保持距離。想知道這份巧合是否有意義。'},
+    {chip:'🛑 關鍵時刻被卡住',
+     ev:'正要寄出一封重要的郵件前，電腦突然當機不動了。一開始很火大，但重開機後再檢查一次郵件，才發現有一個收件人寄錯了。如果就那樣寄出去，應該會非常失禮。',
+     sit:'最近想把工作快點推進，有點焦急。把細節確認往後擺，只想著先送出去再說。想知道這件事是單純的機器故障、可以流過去，還是以理來看有什麼該重新檢視的。',
+     ans:'「先送出去再說」的焦急，讓你確認的眼神變淡了；就在這時被硬生生擋下，多出了重看一次的空檔——看起來是這樣的流動。與其早一步送出，先確認一手，反而常常更快。寄出前停個三秒，試著留下那一點小小的空檔。意義可以流過去，但那份焦急，請輕輕收下。'},
+    {chip:'🤝 物的不順與緣分重疊',
+     ev:'和人約好要見面、正準備出門時，出門前心愛的手錶錶帶斷了。之後對方傳來訊息，說想臨時改約。當下有點不舒服，但仔細想想，最近對這段關係感到勉強，自己其實也有些累了。',
+     sit:'在猶豫該繼續這段關係，還是稍微保持距離。錶帶斷掉和臨時改約剛好重疊，想知道是否有什麼意義。',
+     ans:'錶刻劃時間，錶帶繫住東西。它斷了，也可以看成在問「要就這樣繼續，還是重新繫過」。但更重要的不是事件本身，而是你已經察覺到自己「感到勉強、也累了」。在決定繼續或離開之前，先把自己究竟在勉強什麼寫下來。別去猜對方的心情，先看自己的狀態。'},
     {chip:'🔁 小事接連發生',
-     ev:'正要做重要決定的那天，接連發生了好幾件小狀況。',
-     sit:'在猶豫該就這樣前進，還是先停下來看看。'}
+     ev:'早上出門時鞋帶鬆開了。之後想在便利商店買的飲料剛好賣完。接著又連續遇到好幾個紅燈。並沒有特別不安，只是最近會忍不住想，這些小事是不是有什麼意義。',
+     sit:'現在有點神經質，什麼都會想說是不是理的提示。像這樣的小事，是全部都要讀出意義比較好，還是可以流過去呢？',
+     ans:'鞋帶・賣完・紅燈——各自都是獨立又平常的事。你說「沒有特別不安」，這點很重要。對沒有感覺的事去找意義，只會消耗自己、反而更看不清。現在，比起「找出意義」，或許更需要「放下意義」。這三件，流過去就好。'}
   ]
 };
+var EX_CUR = 0;
 function renderExamples(){
   var ex = CEX[LANG] || CEX.ja;
   var btns = document.querySelectorAll('.exchip');
   for(var i=0;i<btns.length;i++){ if(ex[i]) btns[i].textContent = ex[i].chip; }
 }
-function useExample(i){
+function showExample(i){
   var ex = (CEX[LANG] || CEX.ja)[i]; if(!ex) return;
+  EX_CUR = i;
+  qs('exev').textContent = ex.ev;
+  qs('exsit').textContent = ex.sit;
+  qs('exans').textContent = ex.ans;
+  qs('exmodal').style.display = 'flex';
+}
+function closeExample(){ qs('exmodal').style.display = 'none'; }
+function useExample(){
+  // 見本を入力欄に入れるだけ（送信しない＝この時点では無料回数は減らない）
+  var ex = (CEX[LANG] || CEX.ja)[EX_CUR]; if(!ex) return;
   qs('cevent').value = ex.ev; qs('csituation').value = ex.sit;
   qs('cchars').textContent = ex.ev.length;
+  closeExample();
   qs('cevent').focus();
   qs('cevent').scrollIntoView({behavior:'smooth', block:'center'});
 }
