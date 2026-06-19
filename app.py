@@ -541,6 +541,9 @@ def _shell(title, body):
  input[type=text],input[type=password],input[type=number],textarea{width:100%;padding:11px 13px;font-size:16px;
   border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font-family:inherit;}
  textarea{resize:vertical;line-height:1.7;}
+ .pw{position:relative;display:block;}
+ .pw>input{padding-right:48px;}
+ .eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);margin:0;padding:4px 8px;background:transparent;color:var(--sub);border:none;font-size:20px;cursor:pointer;line-height:1;}
  button,.btn{display:inline-block;margin-top:14px;padding:11px 16px;font-size:15px;font-family:inherit;color:#fff;
   background:var(--ink);border:none;border-radius:9px;letter-spacing:.06em;cursor:pointer;text-decoration:none;}
  button.full{width:100%;}
@@ -556,7 +559,18 @@ def _shell(title, body):
  .row{display:flex;gap:8px;flex-wrap:wrap;}
  .note{font-size:12px;color:var(--sub);margin:6px 0;}
  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-</style></head><body><div class="wrap">""" + body + "</div></body></html>",
+</style></head><body><div class="wrap">""" + body + """
+<script>
+(function(){var ps=document.querySelectorAll('input[type=password]');
+for(var i=0;i<ps.length;i++){(function(inp){
+ var w=document.createElement('span');w.className='pw';
+ inp.parentNode.insertBefore(w,inp);w.appendChild(inp);
+ var b=document.createElement('button');b.type='button';b.className='eye';b.textContent='👁';
+ b.onclick=function(){if(inp.type==='password'){inp.type='text';b.textContent='🙈';}
+  else{inp.type='password';b.textContent='👁';}};
+ w.appendChild(b);})(ps[i]);}})();
+</script>
+</div></body></html>""",
                     mimetype="text/html")
 
 
