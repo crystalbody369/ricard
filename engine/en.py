@@ -46,6 +46,20 @@ REL = {
                 "ikashi": "別想糾正差異，把它當作有趣，當成增加視角的緣分。",
                 "ippo": "今天，把對方的一段話，不否定地聽到最後。"},
     },
+    "en": {
+        "比和": {"opening": ["A bond of ease, with kindred energy.", "Two who can see the same view."],
+                "kankei": "Two whose senses are close — easy to be around.",
+                "ikashi": "Cherish what you both love. Now and then bring in something new from outside; it lasts longer.",
+                "ippo": "Today, enjoy the same thing together."},
+        "相生": {"opening": ["A bond that supports and nurtures.", "Two who draw each other out."],
+                "kankei": "A relationship where one naturally brings out the other.",
+                "ikashi": "Don't fix who gives and who receives — let it circulate, and it grows rich.",
+                "ippo": "Today, give the other one small thank-you."},
+        "相剋": {"opening": ["A bond that polishes — full of spark.", "Two for whom difference becomes learning."],
+                "kankei": "Differences are large and sometimes clash, yet you grow each other.",
+                "ikashi": "Don't try to correct the differences; enjoy them. Use it as a bond that adds perspective.",
+                "ippo": "Today, hear one of their stories through to the end, without denying it."},
+    },
 }
 
 BRANCH_EN = {
@@ -61,18 +75,28 @@ BRANCH_EN = {
         "friction": {"add": "今天注意小誤會。", "kiwotsuke": "別太早下定論，深呼吸後確認。"},
         "calm": {"add": "今天能平穩度過。", "kiwotsuke": "不必特別做什麼，照平常就足夠。"},
     },
+    "en": {
+        "harmony": {"add": "Today your wavelengths align easily.", "kiwotsuke": "Because you fit, don't grow careless — try something new together too."},
+        "clash": {"add": "Today wavers a little.", "kiwotsuke": "Don't push. Don't make it win-or-lose. Sleep on decisions."},
+        "friction": {"add": "Watch for small crossed wires today.", "kiwotsuke": "Don't jump ahead; pause a breath and confirm."},
+        "calm": {"add": "Today passes calmly.", "kiwotsuke": "No need for anything special; as usual is enough."},
+    },
 }
 
 # 言語別ラベル
 _L = {
     "ja": {"subtitle": "二 人 の 縁", "sep": " ・ ",
            "labels": ["二人の関係", "活かし方", "気をつけること", "今日の一歩"],
-           "closing": "縁は、つかむより、育てるもの。", "mark": "理 カ ー ド",
+           "closing": "縁は、つかむより、育てるもの。", "mark": "Kizuki",
            "footer": "これは娯楽・二人で楽しむための目安です。相性の良し悪しを決めるものではありません。"},
     "zh": {"subtitle": "兩 人 的 緣", "sep": " ・ ",
            "labels": ["兩人關係", "相處之道", "留意之處", "今日一步"],
-           "closing": "緣分，與其抓取，不如培養。", "mark": "理 卡",
+           "closing": "緣分，與其抓取，不如培養。", "mark": "Kizuki",
            "footer": "這是供娛樂、兩人同樂的參考，並非用來斷定合不合。"},
+    "en": {"subtitle": "The Bond of Two", "sep": " · ",
+           "labels": ["The relationship", "How to nurture it", "What to mind", "One step today"],
+           "closing": "A bond is grown, not grasped.", "mark": "Kizuki",
+           "footer": "This is a guide for entertainment and to enjoy together, not a judgment of compatibility."},
 }
 
 

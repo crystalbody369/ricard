@@ -748,7 +748,7 @@ def api_en():
     b = request.args.get("b", "")
     ui_lang = request.args.get("lang", "ja")
     ui_lang = ui_lang if ui_lang in ("ja", "zh", "cn", "en") else "ja"
-    content_lang = {"cn": "zh", "en": "ja"}.get(ui_lang, ui_lang)
+    content_lang = {"cn": "zh"}.get(ui_lang, ui_lang)   # cn→繁体(描画で簡体化)、en→英語
     try:
         A = _parse(a)
         B = _parse(b)
@@ -766,7 +766,7 @@ def api_detail():
     g = request.args.get("g", "")
     ui_lang = request.args.get("lang", "ja")
     ui_lang = ui_lang if ui_lang in ("ja", "zh", "cn", "en") else "ja"
-    content_lang = {"cn": "zh", "en": "ja"}.get(ui_lang, ui_lang)
+    content_lang = {"cn": "zh"}.get(ui_lang, ui_lang)   # cn→繁体(後で簡体化)、en→英語
     try:
         birth = _parse(b)
         if h != "":

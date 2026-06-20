@@ -272,6 +272,32 @@ _DETAIL_L = {
                 "此外也一併參看今年干支（流年）・適合你的五行（用神）・"
                 "（填入性別時）目前的十年期（大運）。"),
     },
+    "en": {
+        "methods": "Four Pillars (BaZi, from your birth date) + Nine Star Ki (directions) + the 'Ri' way of seeing",
+        "labels": {"axis": "Your axis (Day Master)", "honmei": "Honmei star (Nine Star)", "strength": "Constitution (strong / weak)",
+                   "tgz": "Today's pillar", "ttg": "Today's Ten God", "fit": "Fit with today", "ppl": "Relation with people (branches)",
+                   "avoid": "Directions to go easy on today (reference)", "liunian": "This year's flow (annual)",
+                   "yojin": "Elements that suit you (useful element, simplified)", "dayun": "Current 10-year luck (Da Yun)"},
+        "strong": "Strong (more energy)", "weak": "Weak (gentler energy)",
+        "favorable": "A tailwind day", "challenging": "A day to go gently",
+        "gloss": {"比劫": "independence / peers / momentum", "食傷": "expression / output / talent", "財": "grasp / connection / money",
+                  "官殺": "discipline / responsibility / restraint", "印": "receiving / learning / support"},
+        "brel": {"clash": "clash (prone to change)", "harmony": "harmony (softens, connects)",
+                 "friction": "friction (small frictions)", "calm": "calm"},
+        "avoidnames": {"五黄殺": "五黄殺", "暗剣殺": "暗剣殺", "日破": "日破", "本命殺": "本命殺", "本命的殺": "本命的殺"},
+        "none": "None in particular", "dayunfmt": "Ages %d–%d: %s (%s)",
+        "note": "This is not for being right; it is a guide to settle today. It makes no assertions.",
+        "how": ("From your birth date we draw the Four Pillars chart (your axis = Day Master), "
+                "read today's theme from its relation to today's pillar = the Ten God \"%s\", "
+                "read 'tailwind or go gently' from how it fits your constitution (strong/weak), "
+                "and read the movement with people from today's relation to your branches. "
+                "Directions come from the day's Nine Star arrangement — the afflicted directions "
+                "(Goō, Anken, day-break) and your Honmei star's position — giving 'directions to go easy on'. "
+                "Auspicious directions differ by school, so we only show clearly-defined ones to avoid. "
+                "Directions other than those listed need not concern you much. "
+                "We also look at this year's pillar (annual), the elements that suit you (useful element), "
+                "and (if you enter gender) your current 10-year period (Da Yun)."),
+    },
 }
 
 
