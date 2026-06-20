@@ -163,7 +163,7 @@ def render_view(view, style_name="morning", lang="ja"):
 
 
 _DAILY_L = {
-    "ja": {"subtitle": "今 日 の 理", "mark": "気 づ き",
+    "ja": {"subtitle": "今 日 の 理", "mark": "Kizuki",
            "labels": ["流れ", "縁・人", "動き", "整える"]},
     "zh": {"subtitle": "今 日 之 理", "mark": "Kizuki",
            "labels": ["流動", "緣分", "行動", "整理"]},
