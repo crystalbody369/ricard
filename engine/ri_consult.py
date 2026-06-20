@@ -23,6 +23,7 @@ from . import store
 
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 900
+SEARCH_MODEL = "claude-haiku-4-5"   # 検索用に質問を日本語化する軽量モデル（安価）
 
 # ── コスト見積り（Sonnet 概算・保守的に全量を満額計算）────────────
 PRICE_IN_USD = 3.0 / 1_000_000     # 入力 1 トークンあたり USD
@@ -264,6 +265,35 @@ def _with_kb(ask, kb_docs, lang):
         "・【%s】%s：%s" % (_STR_LABEL.get(d.get("strength", ""), "B"), d.get("title", ""), d.get("body", ""))
         for d in kb_docs)
     return head + "\n" + lines + "\n\n" + ask
+
+
+def translate_query_for_search(text, lang):
+    """非日本語の相談文を、知識ベース検索用に『日本語キーワード』へ直す（安価なHaiku）。
+    知識ベースは日本語なので、英語/中国語の質問でも正しい理が拾えるようになる。
+    日本語・失敗・キー無しのときは原文をそのまま返す（安全側）。"""
+    text = (text or "").strip()
+    if lang == "ja" or not text:
+        return text
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        return text
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model=SEARCH_MODEL,
+            max_tokens=150,
+            system=("あなたは検索キーワード抽出器です。入力された相談文の意味を、日本語の名詞・語句を中心に"
+                    "短く言い換えてください。出来事・物・体の部位・生き物・感情・テーマを表す日本語の語を並べる。"
+                    "説明・前置き・記号・訳注は不要。日本語の語句だけを返す。"),
+            messages=[{"role": "user", "content": text[:600]}],
+        )
+        store.add_spend(_usage_to_jpy(getattr(msg, "usage", None)))   # 当日累計に加算（安価）
+        parts = [b.text for b in msg.content if getattr(b, "type", "") == "text"]
+        out = "\n".join(parts).strip()
+        return (text + " " + out) if out else text   # 原文＋日本語語句の両方で検索
+    except Exception:
+        return text
 
 
 def consult(event, lang="ja", kb_docs=None, situation=""):

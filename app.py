@@ -28,7 +28,7 @@ from engine.voice import build_card
 from engine.card_image import render, render_view
 from engine.en import build_en
 from engine.flow import build_detail
-from engine.ri_consult import consult
+from engine.ri_consult import consult, translate_query_for_search
 from engine import store
 from engine import auth
 from engine import mailer
@@ -800,7 +800,10 @@ def api_consult():
         msg = "今日のご利用が多いため、いったんお休みです。また明日どうぞ。" if lang == "ja" \
               else "今天使用量較多，先暫歇，明天再來。"
         return jsonify({"ok": False, "text": msg}), 429
-    kb = store.search_ri_docs((event + " " + situation).strip())   # 出来事＋状況で関連検索
+    search_q = (event + " " + situation).strip()
+    if lang != "ja":     # 知識ベースは日本語＝非日本語の質問は日本語キーワードに直してから検索
+        search_q = translate_query_for_search(search_q, lang)
+    kb = store.search_ri_docs(search_q)   # 出来事＋状況で関連検索（4言語とも"理"が効く）
     result = consult(event, lang, kb_docs=kb, situation=situation)
     if result.get("ok"):
         _ip_bump(ip)                         # 成功時のみカウント
