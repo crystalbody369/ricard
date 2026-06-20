@@ -713,7 +713,8 @@ def index():
         return _shell("", _landing_html())
     acct = ('  ・  <a href="/admin" style="color:var(--gold)">管理者画面</a>'
             if (u and u["is_admin"]) else "")
-    resp = Response(PAGE.replace("<!--ACCT-->", acct), mimetype="text/html")
+    html = PAGE.replace("<!--ACCT-->", acct).replace("</body>", PWA_BANNER + "</body>")
+    resp = Response(html, mimetype="text/html")
     # 常に最新ページを配る（古いキャッシュで新機能が動かないのを防ぐ）
     resp.headers["Cache-Control"] = "no-store, max-age=0"
     return resp
@@ -1314,7 +1315,41 @@ def _landing_html():
         'var lg=D.legal[lang];el("lp_legalH").textContent=lg.heading;var h="";'
         'for(var i=0;i<lg.rows.length;i++){h+="<tr><td style=\\"color:var(--sub);white-space:nowrap;vertical-align:top\\">"+lg.rows[i][0]+"</td><td>"+lg.rows[i][1]+"</td></tr>";}'
         'el("lp_legal").innerHTML=h;}'
-        'render();})();</script>')
+        'render();})();</script>' + PWA_BANNER)
+
+
+# ホーム画面に追加（PWAインストール）の案内バナー。アプリ・公開トップ共通。
+# Android/Chrome＝インストールボタン、iPhone/Safari＝手順を図解。一度閉じたら再表示しない。
+PWA_BANNER = """
+<div id="pwaBanner" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:70;background:#fffdf8;border-top:1px solid #e4d8c2;box-shadow:0 -4px 16px rgba(80,60,30,.10)">
+ <div style="max-width:520px;margin:0 auto;display:flex;align-items:center;gap:10px;padding:10px 12px">
+  <img src="/icon-192.png" alt="Kizuki" width="42" height="42" style="border-radius:10px;flex:none">
+  <div style="flex:1;font-size:13px;line-height:1.55;color:#3a322a" id="pwaText"></div>
+  <button type="button" id="pwaInstall" style="display:none;margin:0;padding:8px 14px;font-size:13px;white-space:nowrap;color:#fff;background:#3a322a;border:none;border-radius:9px;cursor:pointer"></button>
+  <button type="button" id="pwaClose" aria-label="close" style="margin:0;padding:2px 8px;width:auto;background:none;border:none;color:#8a7b63;font-size:22px;line-height:1;cursor:pointer">&times;</button>
+ </div>
+</div>
+<script>(function(){
+ var I={ja:{a:'Kizukiをホーム画面に追加して、アプリとして使えます。',btn:'追加',ios:'ホーム画面に追加：下の共有ボタン（□↑）→「ホーム画面に追加」'},
+        zh:{a:'把 Kizuki 加到主畫面，就能像 App 一樣使用。',btn:'加入',ios:'加到主畫面：點下方分享按鈕（□↑）→「加入主畫面」'},
+        cn:{a:'把 Kizuki 加到主屏幕，就能像 App 一样使用。',btn:'添加',ios:'加到主屏幕：点下方分享按钮（□↑）→「添加到主屏幕」'},
+        en:{a:'Add Kizuki to your home screen to use it like an app.',btn:'Install',ios:'Add to Home Screen: tap the Share button below (square with an up-arrow), then "Add to Home Screen".'}};
+ function lang(){try{var s=localStorage.getItem('ricard_lang');if(s&&I[s])return s;}catch(e){}return 'ja';}
+ var t=I[lang()];
+ var standalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;
+ if(standalone)return;
+ try{if(localStorage.getItem('pwa_dismissed')==='1')return;}catch(e){}
+ var ban=document.getElementById('pwaBanner'),txt=document.getElementById('pwaText'),btn=document.getElementById('pwaInstall'),cl=document.getElementById('pwaClose');
+ if(!ban)return;
+ cl.onclick=function(){ban.style.display='none';try{localStorage.setItem('pwa_dismissed','1');}catch(e){}};
+ var ua=navigator.userAgent||'';
+ var iOS=/iphone|ipad|ipod/i.test(ua), iosSafari=iOS&&!/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+ var deferred=null;
+ window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;txt.textContent=t.a;btn.textContent=t.btn;btn.style.display='inline-block';ban.style.display='block';});
+ btn.onclick=function(){if(!deferred)return;deferred.prompt();deferred.userChoice.then(function(){ban.style.display='none';deferred=null;});};
+ if(iosSafari){txt.textContent=t.ios;setTimeout(function(){ban.style.display='block';},1200);}
+})();</script>
+"""
 
 
 # /sample 用：実アプリのページ(PAGE)そのものに差し込むスクリプト。
