@@ -214,22 +214,29 @@ def create_code(code, max_uses=0, grant_days=None, grant_free=None, expires_on=N
             (code, int(max_uses), code, expires_on, grant_days, grant_free, note))
 
 
+def _live_uses(conn, code):
+    """そのコードで実際に登録している利用者の数（削除すれば即減る）。"""
+    r = conn.execute("SELECT COUNT(*) AS n FROM users WHERE note=?", ("紹介:" + code,)).fetchone()
+    return r["n"] if r else 0
+
+
 def list_codes():
     with store.get_conn() as conn:
         rows = conn.execute("SELECT * FROM invite_codes ORDER BY created_at DESC").fetchall()
-    out = []
-    today = datetime.date.today().isoformat()
-    for r in rows:
-        expired = bool(r["expires_on"]) and today > r["expires_on"]
-        full = r["max_uses"] and r["used_count"] >= r["max_uses"]
-        out.append({
-            "code": r["code"], "enabled": bool(r["enabled"]),
-            "max_uses": r["max_uses"], "used_count": r["used_count"],
-            "expires_on": r["expires_on"] or "無期限",
-            "grant_days": r["grant_days"], "grant_free": r["grant_free"], "note": r["note"] or "",
-            "状態": ("停止中" if not r["enabled"] else "期限切れ" if expired
-                    else "上限到達" if full else "有効"),
-        })
+        out = []
+        today = datetime.date.today().isoformat()
+        for r in rows:
+            used = _live_uses(conn, r["code"])     # 実数（削除と連動）
+            expired = bool(r["expires_on"]) and today > r["expires_on"]
+            full = r["max_uses"] and used >= r["max_uses"]
+            out.append({
+                "code": r["code"], "enabled": bool(r["enabled"]),
+                "max_uses": r["max_uses"], "used_count": used,
+                "expires_on": r["expires_on"] or "無期限",
+                "grant_days": r["grant_days"], "grant_free": r["grant_free"], "note": r["note"] or "",
+                "状態": ("停止中" if not r["enabled"] else "期限切れ" if expired
+                        else "上限到達" if full else "有効"),
+            })
     return out
 
 
@@ -251,7 +258,7 @@ def _valid_code(conn, code):
     today = datetime.date.today().isoformat()
     if r["expires_on"] and today > r["expires_on"]:
         return None
-    if r["max_uses"] and r["used_count"] >= r["max_uses"]:
+    if r["max_uses"] and _live_uses(conn, code) >= r["max_uses"]:
         return None
     return r
 
