@@ -269,6 +269,7 @@ PAGE = """<!doctype html>
 
 <script>
 function qs(id){ return document.getElementById(id); }
+function T(){ return I18N[LANG] || I18N.ja; }
 
 var I18N = {
   ja: {h1:'Kizuki', tag:'今日を、当てずに整える。', h2today:'今日の理', gear:'⚙ 設定',
@@ -291,6 +292,11 @@ var I18N = {
        remain:'残り{n}回', consultempty:'出来事を書いてください。', consultlimit:'今日の無料分（3回）は終わりました。また明日どうぞ。',
        consultwait:'理で観ています…', consultfail:'うまく言葉にできませんでした。少し時間をおいて、もう一度お試しください。',
        logout:'ログアウト', footown:'運営', footlegal:'特定商取引法に基づく表記',
+       needbirth:'生年月日を選んでください', needbirthset:'先に「設定」であなたの生年月日を入れてください',
+       needpartner:'お相手の生年月日を選んでください', genfail:'うまくいきませんでした。もう一度お試しください。',
+       invitecopied:'招待リンクをコピーしました。LINEやメールで相手に送ってください。', inviteprompt:'このリンクを送ってください',
+       preparing:'準備中です', sharecard:'今日の理', sharetext:'二人の縁、見てみない？',
+       bannerinvite:'あなたとの「縁」を見たい人からの招待です。あなたの生年月日は「設定」から入れてください。',
        foot:'これは娯楽・自己内省のための目安です。当たり外れを決めるものではありません。', detailbase:'占いの土台：'},
   zh: {h1:'Kizuki', tag:'不為了算準，而是整理今天。', h2today:'今日之理', gear:'⚙ 設定',
        lblbirth:'你的生日', lbltime:'出生時間（若知道・可選）', lblgender:'性別（用於大運計算・可選）',
@@ -312,6 +318,11 @@ var I18N = {
        remain:'剩餘{n}次', consultempty:'請先寫下事情。', consultlimit:'今天的免費次數（3次）已用完，明天再來。',
        consultwait:'正以理觀照中…', consultfail:'這次沒能好好回應。請稍後再試一次。',
        logout:'登出', footown:'營運', footlegal:'法律聲明（特定商取引法）',
+       needbirth:'請選擇生日', needbirthset:'請先在「設定」輸入你的生日',
+       needpartner:'請選擇對方的生日', genfail:'這次沒能成功，請再試一次。',
+       invitecopied:'已複製邀請連結，請用LINE或郵件傳給對方。', inviteprompt:'請傳送這個連結',
+       preparing:'準備中', sharecard:'今日之理', sharetext:'要不要看看兩人的緣分？',
+       bannerinvite:'有人想看與你的「緣分」。請在「設定」輸入你的生日。',
        foot:'這是供娛樂、自我省思的參考，並非用來斷定準不準。', detailbase:'占算依據：'},
   cn: {h1:'Kizuki', tag:'不为了算准，而是整理今天。', h2today:'今日之理', gear:'⚙ 设置',
        lblbirth:'你的生日', lbltime:'出生时间（若知道・可选）', lblgender:'性别（用于大运计算・可选）',
@@ -333,6 +344,11 @@ var I18N = {
        remain:'剩余{n}次', consultempty:'请先写下事情。', consultlimit:'今天的免费次数（3次）已用完，明天再来。',
        consultwait:'正以理观照中…', consultfail:'这次没能好好回应。请稍后再试一次。',
        logout:'登出', footown:'运营', footlegal:'法律声明（特定商取引法）',
+       needbirth:'请选择生日', needbirthset:'请先在「设置」输入你的生日',
+       needpartner:'请选择对方的生日', genfail:'这次没能成功，请再试一次。',
+       invitecopied:'已复制邀请链接，请用LINE或邮件发给对方。', inviteprompt:'请发送这个链接',
+       preparing:'准备中', sharecard:'今日之理', sharetext:'要不要看看两人的缘分？',
+       bannerinvite:'有人想看与你的「缘分」。请在「设置」输入你的生日。',
        foot:'这是供娱乐、自我省思的参考，并非用来断定准不准。', detailbase:'推算依据：'},
   en: {h1:'Kizuki', tag:'Settle today, not predict it.', h2today:"Today's Ri", gear:'⚙ Settings',
        lblbirth:'Your date of birth', lbltime:'Time of birth (optional)', lblgender:'Gender (for fortune-cycle calc, optional)',
@@ -354,6 +370,11 @@ var I18N = {
        remain:'{n} left', consultempty:'Please write the event.', consultlimit:"Today's free uses (3) are done. Please come again tomorrow.",
        consultwait:'Observing through Ri…', consultfail:"I couldn't put it into words this time. Please wait a moment and try again.",
        logout:'Log out', footown:'Operated by', footlegal:'Legal Notice (JP Commercial Transactions Act)',
+       needbirth:'Please choose your date of birth', needbirthset:'Please enter your date of birth in Settings first',
+       needpartner:"Please choose the other person's date of birth", genfail:"That didn't work. Please try again.",
+       invitecopied:'Invite link copied. Send it to them via chat or email.', inviteprompt:'Please send this link',
+       preparing:'Coming soon', sharecard:"Today's Ri", sharetext:'Want to see the bond between us?',
+       bannerinvite:'Someone wants to see their bond with you. Please enter your date of birth in Settings.',
        foot:'This is a guide for entertainment and self-reflection, not a judgment of right or wrong.', detailbase:'Basis of the reading: '}
 };
 // 相談の参考例（タップで入力欄に入る）。chip=ボタンに出す短い見出し。
@@ -470,13 +491,13 @@ function saveProfile(){
                           email: (qs('myemail')?qs('myemail').value:'')})}); }catch(e){}
 }
 function saveAndShow(){
-  if(!qs('me').value){ alert('生年月日を選んでください'); qs('me').focus(); return; }
+  if(!qs('me').value){ alert(T().needbirth); qs('me').focus(); return; }
   saveProfile(); showCard(); qs('settings').style.display='none';
 }
 function showCard(){
   try{
     var b = qs('me').value;
-    if(!b){ alert('生年月日を選んでください'); qs('me').focus(); return; }
+    if(!b){ alert(T().needbirth); qs('me').focus(); return; }
     var t = qs('metime').value;  // "HH:MM" または ""
     var url = '/api/card?b=' + b + '&d=' + localToday() + '&lang=' + LANG;
     if(t){ url += '&h=' + parseInt(t.split(':')[0], 10); }
@@ -488,25 +509,25 @@ function showCard(){
     };
     img.onerror = function(){
       img.style.opacity = '1';
-      alert('カードの生成に失敗しました。もう一度お試しください。');
+      alert(T().genfail);
     };
     img.src = url + '&_=' + Date.now();
     img.style.display = 'block';
     qs('cardBtns').classList.remove('hidden');
     qs('detailBtn').classList.remove('hidden');
   }catch(err){
-    alert('エラー: ' + (err && err.message ? err.message : err));
+    alert(T().genfail);
   }
 }
 
 function showEn(){
   var a = qs('me').value, b = qs('enB').value;
-  if(!a){ alert('先に「設定」であなたの生年月日を入れてください'); toggleSettings(); return; }
-  if(!b){ alert('お相手の生年月日を選んでください'); return; }
+  if(!a){ alert(T().needbirthset); toggleSettings(); return; }
+  if(!b){ alert(T().needpartner); return; }
   var img = qs('enImg');
   img.style.opacity = '0.35';
   img.onload = function(){ img.style.opacity='1'; img.scrollIntoView({behavior:'smooth', block:'center'}); };
-  img.onerror = function(){ img.style.opacity='1'; alert('縁カードの生成に失敗しました。'); };
+  img.onerror = function(){ img.style.opacity='1'; alert(T().genfail); };
   img.src = '/api/en?a=' + a + '&b=' + b + '&lang=' + LANG + '&_=' + Date.now();
   img.style.display = 'block';
   qs('enBtns').classList.remove('hidden');
@@ -523,7 +544,7 @@ async function shareImg(id, name){
     var r = await fetch(src); var blob = await r.blob();
     var file = new File([blob], name, {type:'image/png'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], text:'今日の理'});
+      await navigator.share({files:[file], text:T().sharecard});
       return;
     }
   }catch(e){}
@@ -532,20 +553,20 @@ async function shareImg(id, name){
 
 function copyInvite(){
   var a = qs('me').value;
-  if(!a){ alert('先に「設定」であなたの生年月日を入れてください'); toggleSettings(); return; }
+  if(!a){ alert(T().needbirthset); toggleSettings(); return; }
   var link = location.origin + '/?en=' + a;
   // スマホ：OSの共有メニュー（LINE・メール等）を開く
   if(navigator.share){
-    navigator.share({ title:'Kizuki', text:'二人の縁、見てみない？', url: link }).catch(function(){});
+    navigator.share({ title:'Kizuki', text:T().sharetext, url: link }).catch(function(){});
     return;
   }
   // PC等：クリップボードにコピー
   if(navigator.clipboard){
     navigator.clipboard.writeText(link).then(function(){
-      alert('招待リンクをコピーしました。LINEやメールで相手に送ってください。');
-    }, function(){ prompt('このリンクを送ってください', link); });
+      alert(T().invitecopied);
+    }, function(){ prompt(T().inviteprompt, link); });
   } else {
-    prompt('このリンクを送ってください', link);
+    prompt(T().inviteprompt, link);
   }
 }
 
@@ -585,7 +606,7 @@ async function buyCredits(){
     var j = await r.json();
     if(j.ok && j.url){ window.location = j.url; }
     else { alert(j.text || '準備中です'); }
-  }catch(e){ alert('準備中です'); }
+  }catch(e){ alert(T().preparing); }
 }
 
 function renderDetail(j){
@@ -595,7 +616,7 @@ function renderDetail(j){
   return html;
 }
 function showDetail(){
-  var b = qs('me').value; if(!b){ alert('先に生年月日を入れてください'); return; }
+  var b = qs('me').value; if(!b){ alert(T().needbirth); return; }
   var el = qs('detail');
   if(el.style.display === 'block'){ el.style.display='none'; return; }
   var t = qs('metime').value, g = qs('gender').value;
@@ -606,7 +627,7 @@ function showDetail(){
     el.innerHTML = renderDetail(j);
     el.style.display = 'block';
     el.scrollIntoView({behavior:'smooth', block:'center'});
-  }).catch(function(){ alert('詳細の取得に失敗しました。'); });
+  }).catch(function(){ alert(T().genfail); });
 }
 
 // 起動時：前回の生年月日を思い出して今日のカードを自動表示／招待リンク処理
@@ -616,7 +637,7 @@ function showDetail(){
   var en = p.get('en');
   if(en){
     qs('enB').value = en;
-    qs('banner').textContent = 'あなたとの「縁」を見たい人からの招待です。あなたの生年月日は「設定」から入れてください。';
+    qs('banner').textContent = T().bannerinvite;
     qs('banner').style.display = 'block';
   }
   if(p.get('paid') === '1'){
