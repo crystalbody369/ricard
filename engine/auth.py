@@ -53,9 +53,82 @@ def init_auth():
             conn.execute("ALTER TABLE users ADD COLUMN credits INTEGER DEFAULT 0")
         if "free_quota" not in cols:   # この利用者に与えられた無料回数（NULL=既定値）
             conn.execute("ALTER TABLE users ADD COLUMN free_quota INTEGER")
+        if "email" not in cols:   # パスワード再設定用のメールアドレス
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
         ic_cols = [r[1] for r in conn.execute("PRAGMA table_info(invite_codes)").fetchall()]
         if "grant_free" not in ic_cols:   # このコードで登録した人に与える無料回数（NULL=既定）
             conn.execute("ALTER TABLE invite_codes ADD COLUMN grant_free INTEGER")
+        # パスワード再設定トークン（メールのリンクで本人が自分で再設定する）
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS password_resets (
+                token_hash TEXT PRIMARY KEY,
+                username   TEXT,
+                expires    TEXT,
+                used       INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now','localtime'))
+            )""")
+
+
+def _valid_email(email):
+    email = (email or "").strip()
+    return bool(email) and "@" in email and "." in email.split("@")[-1] and len(email) <= 200
+
+
+_RESET_TTL_MIN = 60   # 再設定リンクの有効時間（分）
+
+
+def _tok_hash(raw):
+    return hashlib.sha256((raw or "").encode("utf-8")).hexdigest()
+
+
+def set_email(username, email):
+    email = (email or "").strip()
+    with store.get_conn() as conn:
+        conn.execute("UPDATE users SET email=? WHERE username=?", (email, username))
+
+
+def get_email(username):
+    with store.get_conn() as conn:
+        r = conn.execute("SELECT email FROM users WHERE username=?", (username,)).fetchone()
+    return (r["email"] or "") if r else ""
+
+
+def create_reset_token(email):
+    """メールから本人を特定し、再設定トークンを発行。
+    戻り値 (username, raw_token) ／ 該当なしは None（存在は伏せる＝呼び出し側で同じ応答）。"""
+    email = (email or "").strip()
+    if not email:
+        return None
+    with store.get_conn() as conn:
+        r = conn.execute("SELECT username FROM users WHERE lower(email)=lower(?) AND enabled=1",
+                         (email,)).fetchone()
+        if not r:
+            return None
+        username = r["username"]
+        raw = secrets.token_urlsafe(32)
+        expires = (datetime.datetime.now() + datetime.timedelta(minutes=_RESET_TTL_MIN)).isoformat()
+        conn.execute("INSERT INTO password_resets(token_hash, username, expires, used) VALUES(?,?,?,0)",
+                     (_tok_hash(raw), username, expires))
+    return (username, raw)
+
+
+def consume_reset_token(raw, new_password):
+    """トークンが有効なら新パスワードを設定し、ロックも解除。戻り値 username／無効は None。"""
+    if not raw or not new_password or len(new_password) < 6:
+        return None
+    th = _tok_hash(raw)
+    now = datetime.datetime.now().isoformat()
+    with store.get_conn() as conn:
+        r = conn.execute("SELECT username, expires, used FROM password_resets WHERE token_hash=?",
+                         (th,)).fetchone()
+        if not r or r["used"] or (r["expires"] and now > r["expires"]):
+            return None
+        username = r["username"]
+        salt = secrets.token_hex(16)
+        conn.execute("UPDATE users SET pw_hash=?, salt=?, failed_count=0, locked_until=NULL WHERE username=?",
+                     (_hash(new_password, salt), salt, username))
+        conn.execute("UPDATE password_resets SET used=1 WHERE token_hash=?", (th,))
+    return username
 
 
 def get_balance(username, default_free):
@@ -183,14 +256,17 @@ def _valid_code(conn, code):
     return r
 
 
-def register_with_code(code, username, password):
-    """紹介コードを使った新規登録。成功で expires_on を返す。"""
+def register_with_code(code, username, password, email=""):
+    """紹介コードを使った新規登録。成功で expires_on を返す。メールは再設定用に必須。"""
     code = (code or "").strip()
     username = (username or "").strip()
+    email = (email or "").strip()
     if not code:
         raise ValueError("紹介コードを入力してください")
     if not username or not password:
         raise ValueError("ユーザー名とパスワードを入力してください")
+    if not _valid_email(email):
+        raise ValueError("メールアドレスを正しく入力してください（パスワードを忘れた時の再設定に使います）")
     if len(password) < 6:
         raise ValueError("パスワードは6文字以上にしてください")
     with store.get_conn() as conn:
@@ -206,9 +282,9 @@ def register_with_code(code, username, password):
                       if gd is not None else None)
         gf = cr["grant_free"]   # このコードが与える無料回数（NULL=既定）
         conn.execute(
-            """INSERT INTO users (username, pw_hash, salt, expires_on, enabled, is_admin, note, free_quota)
-               VALUES (?, ?, ?, ?, 1, 0, ?, ?)""",
-            (username, pwh, salt, expires_on, "紹介:" + code, gf))
+            """INSERT INTO users (username, pw_hash, salt, expires_on, enabled, is_admin, note, free_quota, email)
+               VALUES (?, ?, ?, ?, 1, 0, ?, ?, ?)""",
+            (username, pwh, salt, expires_on, "紹介:" + code, gf, email))
         conn.execute("UPDATE invite_codes SET used_count=used_count+1 WHERE code=?", (code,))
     return expires_on
 
@@ -267,7 +343,7 @@ def list_users():
     with store.get_conn() as conn:
         rows = conn.execute(
             "SELECT username, expires_on, enabled, is_admin, note, created_at, "
-            "free_quota, free_used, credits "
+            "free_quota, free_used, credits, email "
             "FROM users ORDER BY is_admin DESC, username").fetchall()
     today = datetime.date.today().isoformat()
     out = []
@@ -279,7 +355,7 @@ def list_users():
             "enabled": bool(r["enabled"]), "is_admin": bool(r["is_admin"]),
             "note": r["note"] or "",
             "free_quota": r["free_quota"], "free_used": r["free_used"] or 0,
-            "credits": r["credits"] or 0,
+            "credits": r["credits"] or 0, "email": r["email"] or "",
             "状態": ("管理者" if r["is_admin"] else "停止中" if not r["enabled"]
                     else "期限切れ" if expired else "有効"),
         })
