@@ -84,19 +84,27 @@ def _motif(img, kind, style):
 
 
 def _wrap(draw, text, font, maxw):
-    lines, cur = [], ""
-    for ch in text:
-        if ch == "\n":
-            lines.append(cur)
+    lines = []
+    for para in (text or "").split("\n"):
+        if " " in para:   # 英語など：単語単位で折り返す（語を割らない）
             cur = ""
-            continue
-        if draw.textlength(cur + ch, font=font) <= maxw:
-            cur += ch
-        else:
+            for word in para.split(" "):
+                trial = (cur + " " + word) if cur else word
+                if not cur or draw.textlength(trial, font=font) <= maxw:
+                    cur = trial
+                else:
+                    lines.append(cur)
+                    cur = word
             lines.append(cur)
-            cur = ch
-    if cur:
-        lines.append(cur)
+        else:             # 日本語・中国語：1文字ずつ
+            cur = ""
+            for ch in para:
+                if draw.textlength(cur + ch, font=font) <= maxw:
+                    cur += ch
+                else:
+                    lines.append(cur)
+                    cur = ch
+            lines.append(cur)
     return lines
 
 
@@ -189,6 +197,8 @@ _DAILY_L = {
            "labels": ["流動", "緣分", "行動", "整理"]},
     "cn": {"subtitle": "今 日 之 理", "mark": "Kizuki",
            "labels": ["流动", "缘分", "行动", "整理"]},
+    "en": {"subtitle": "Today's Ri", "mark": "Kizuki",
+           "labels": ["Flow", "People", "Movement", "Settle"]},
 }
 
 

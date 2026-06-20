@@ -726,7 +726,7 @@ def api_card():
     h = request.args.get("h", "")   # 生まれた時間（任意・0〜23時）
     ui_lang = request.args.get("lang", "ja")
     ui_lang = ui_lang if ui_lang in ("ja", "zh", "cn", "en") else "ja"
-    content_lang = {"cn": "zh", "en": "ja"}.get(ui_lang, ui_lang)   # 本文生成：cn→繁体, en→日本語
+    content_lang = {"cn": "zh"}.get(ui_lang, ui_lang)   # 本文生成：cn→繁体(描画で簡体化)、en→英語
     try:
         birth = _parse(b)
         if h != "":

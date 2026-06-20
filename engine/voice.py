@@ -31,6 +31,18 @@ OPENING = {
         "印": {"favorable": ["今天，接收、被填滿的一天。", "今天，可以依靠他人的一天。"],
               "challenging": ["今天，不過度索求、靜待的一天。", "今天，整理內在的一天。"]},
     },
+    "en": {
+        "比劫": {"favorable": ["A day you can move on your own feet.", "A day to take a step without hesitation."],
+                "challenging": ["A day to not carry it all — let others share.", "A day to ease off the strain."]},
+        "食傷": {"favorable": ["A day where putting it out and moving flows.", "The more you express, the more it settles."],
+                "challenging": ["A day to keep some in reserve, not spend it all.", "A day to quietly put things away."]},
+        "財": {"favorable": ["A day you can reach for the meetings that come.", "A day to extend your hand to a connection."],
+              "challenging": ["A day to receive what comes, without grasping.", "A day to welcome rather than seize."]},
+        "官殺": {"favorable": ["A day to straighten your back and settle.", "A day where order carries you forward."],
+                "challenging": ["A day to quietly hold, not push.", "A day to wait without deciding."]},
+        "印": {"favorable": ["A day to receive and be filled.", "A day it's alright to lean on others."],
+              "challenging": ["A day to wait without asking too much.", "A day to set your inner self in order."]},
+    },
 }
 
 FLOW = {
@@ -58,6 +70,18 @@ FLOW = {
         "印": {"favorable": ["需要的，會從人或資訊進來。坦然接收。", "學習與休息，之後會發揮作用。"],
               "challenging": ["與其索求，不如整理後等待。現在是充電。", "別急，待在安靜裡也很好。"]},
     },
+    "en": {
+        "比劫": {"favorable": ["You may go straight toward what you want to do.", "Trust your own judgment, and it moves along."],
+                "challenging": ["Don't carry it alone; sharing lightens it.", "Rather than contend, let it flow — it's easier."]},
+        "食傷": {"favorable": ["Rather than think, shape it with your hands.", "Try putting what you thought of into the open."],
+                "challenging": ["Putting out too much tires you. Narrow to one.", "No need to finish today; you may let it rest."]},
+        "財": {"favorable": ["The chance that came, you may receive — just don't rush.", "A practical move is likely to bear fruit today."],
+              "challenging": ["Rather than chase, wait for it to come.", "Money and numbers — just check them quietly."]},
+        "官殺": {"favorable": ["Do what should be done, calmly. Order moves you on.", "Keeping to form, you become freer today."],
+                "challenging": ["A day pushing tends to stall. Sleep on big calls.", "Just holding your ground is enough today."]},
+        "印": {"favorable": ["What you need comes from people and news. Receive it.", "Learning and rest take effect later."],
+              "challenging": ["Rather than seek, set things in order and wait.", "Don't rush; it's fine to stay in the quiet."]},
+    },
 }
 
 EN_HITO = {
@@ -72,6 +96,12 @@ EN_HITO = {
         "clash": ["人際容易有變動的一天，話少一點、客氣些。", "容易起波動的一天，深呼吸後再回應。"],
         "friction": ["容易有小誤會的一天，別急、確認清楚。", "注意細微的擦身，別太早下結論。"],
         "calm": ["人際平穩，照平常就好。", "與人之間，今天靜靜維持著。"],
+    },
+    "en": {
+        "harmony": ["A day bonds soften. You may lean on others honestly.", "Connections move comfortably today."],
+        "clash": ["A day relationships shift. Keep words few and gentle.", "A day prone to waver. Breathe before you reply."],
+        "friction": ["A day small misunderstandings arise. Don't rush; confirm.", "Watch for little crossed wires. Don't jump ahead."],
+        "calm": ["With people, calm. As usual is fine.", "The space between you and others stays quiet."],
     },
 }
 
@@ -90,6 +120,13 @@ TOTONOE = {
         "官殺": {"favorable": ["整理周遭，定下一個步驟。"], "challenging": ["重大的決定，今天先不做。"]},
         "印": {"favorable": ["吸收一個學習或資訊。"], "challenging": ["把一份感謝，說出口。"]},
     },
+    "en": {
+        "比劫": {"favorable": ["Move the one thing you decided on, today."], "challenging": ["Try asking one person for one thing."]},
+        "食傷": {"favorable": ["Put out one of the things you've half-made."], "challenging": ["Stop your hands and take time to rest."]},
+        "財": {"favorable": ["Don't be greedy; take just one."], "challenging": ["Quietly review your money and numbers."]},
+        "官殺": {"favorable": ["Tidy your surroundings and decide one step."], "challenging": ["Don't make big decisions today."]},
+        "印": {"favorable": ["Take in one piece of learning or news."], "challenging": ["Put one gratitude into words."]},
+    },
 }
 
 CLOSING = {
@@ -103,12 +140,19 @@ CLOSING = {
         "財": ["與其抓取，不如迎接。"], "官殺": ["看似停下，其實是在整理的時間。"],
         "印": ["接收，也是前進的一種。"],
     },
+    "en": {
+        "比劫": ["Don't hurry, but don't stop."], "食傷": ["By putting out, the flow begins."],
+        "財": ["Rather than grasp, welcome."], "官殺": ["What looks stopped is time spent ordering."],
+        "印": ["Receiving, too, is part of moving forward."],
+    },
 }
 
 _TIMING_ZH = {"午前": "上午", "午後": "下午", "夜": "夜晚", "日中": "白天"}
+_TIMING_EN = {"午前": "morning", "午後": "afternoon", "夜": "evening", "日中": "daytime"}
 _FOOTER = {
     "ja": "これは娯楽・自己内省のための目安です。断定するものではありません。方位は簡易計算の参考です。",
     "zh": "這是供娛樂、自我省思的參考，並非斷定。方位為簡易計算的參考。",
+    "en": "This is a guide for entertainment and self-reflection, not a judgment. Directions are a rough reference.",
 }
 
 
@@ -124,6 +168,9 @@ def compose(m, lang="ja"):
     if lang == "zh":
         prefix = "別急，" if brel == "clash" else ""
         ugoki = "%s若要行動，%s較沉穩。" % (prefix, _TIMING_ZH[m["timing"]])
+    elif lang == "en":
+        prefix = "Don't rush — " if brel == "clash" else ""
+        ugoki = "%sIf you move, the %s is calmer." % (prefix, _TIMING_EN[m["timing"]])
     else:
         prefix = "急がず、" if brel == "clash" else ""
         ugoki = "%sもし動くなら、%sが落ち着きます。" % (prefix, m["timing"])
