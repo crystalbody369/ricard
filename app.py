@@ -699,9 +699,9 @@ def legal():
 def index():
     u = _current_user()
     if not u:
-        # 未ログインの人には公開ページ（サービス説明・料金）を見せる。
-        # ＝Stripe審査の「販売内容を確認できる・パスワードで保護されていない」要件を満たす。
-        return _shell("ようこそ", LANDING_BODY)
+        # 未ログインの人には公開ページ（4言語・ブラウザ言語自動判定）を見せる。
+        # ＝Stripe審査の要件を満たしつつ、海外向けの宣伝もできる。
+        return _shell("Kizuki", _landing_html())
     acct = ('  ・  <a href="/admin" style="color:var(--gold)">管理者画面</a>'
             if (u and u["is_admin"]) else "")
     resp = Response(PAGE.replace("<!--ACCT-->", acct), mimetype="text/html")
@@ -1103,49 +1103,145 @@ LEGAL_CARD = '<div class="card"><h2>%s</h2><table>%s</table></div>' % (
 
 
 # ログインしていない人に見せる公開ページ（サービス説明・料金・規約）。
-LANDING_BODY = """<h1>Kizuki</h1><p class="tag">今日を、当てずに整える。</p>
+# 公開トップ（宣伝の顔）の文言。4言語＋ブラウザ言語の自動判定でその言語に表示。
+LANDING_L = {
+    "ja": {"tag": "今日を、当てずに整える。",
+           "whatH": "Kizukiとは",
+           "whatP": "気になった出来事を書くと、「理（ことわり）」の視点で静かに観る、相談のためのアプリです。当てる占いではありません。出来事の良し悪しを決めつけず、「いま何に気づき、何を整えるとよいか」を一緒に観ます。",
+           "supports": "日本語・繁體中文・简体中文・English に対応しています。",
+           "canH": "できること",
+           "can": ["気になった出来事と、いまの気持ち・状況を書く",
+                   "理の視点での観方が返ってきます（断定せず、流してよい時は「流してよい」とお伝えします）",
+                   "生年月日から「今日の理」も見られます"],
+           "sampleH": "サービスの一例（こんなふうに観ます）", "sampleLead": "実際にアプリで返ってくる回答の一例です。", "seeScreen": "▶ ログイン後の画面イメージを見る",
+           "lblEv": "相談した出来事：", "lblSit": "いまの状況：", "lblAns": "理の観方（回答例）：",
+           "ev": "大事なメールを送ろうとした直前に、パソコンが急に固まりました。再起動して見直したら、宛先を一人間違えていたことに気づきました。",
+           "sit": "仕事を早く進めようと焦っていて、確認を後回しにしていました。",
+           "ans": "焦って「先に送ろう」とする気持ちが、確かめる目を薄くしていた。そこへ強制的に止められ、もう一度見る間ができた――そんな流れに見えます。一歩早く送るより、一手確かめてから送るほうが、結局は早いことがあります。送る前に三秒だけ止まる、その小さな間を意識してみては。意味は流してもよいですが、焦りだけはそっと受け取っておいてください。",
+           "priceH": "料金・購入で得られるもの", "priceLead": "まずは無料でお試しいただけます。続けて使いたい方は：", "priceBig": "相談30回分 ＝ ¥500（税込）",
+           "p": ["購入すると、アプリ内で相談を30回利用できる回数が付与されます。",
+                 "買い切り（1回きりのお支払い）。自動更新・サブスクではありません。",
+                 "お支払いは Stripe（クレジットカード）で安全に処理されます。"],
+           "refund": "デジタルサービスの性質上、付与後の返金は原則としてお受けできません。不具合等があればお問い合わせください。",
+           "privacyH": "プライバシー", "privacyP": "相談で入力した文章は保存しません。その場で観るために使うだけです。",
+           "useH": "ご利用にあたって", "useP": "本サービスは娯楽・自己内省のための目安です。占いの当たり外れを保証するものではありません。医療・投資・法律などの専門的な助言ではありません。重要な判断はご自身で、必要に応じて専門家にご相談ください。",
+           "startH": "はじめる", "startP": "現在は招待制です。紹介コードをお持ちの方はご登録いただけます。", "btnLogin": "ログイン", "btnRegister": "紹介コードで登録"},
+    "zh": {"tag": "不為了算準，而是整理今天。",
+           "whatH": "關於 Kizuki",
+           "whatP": "寫下在意的事，便以「理」的視角靜靜地觀照，是一款諮詢的應用程式。不是算準的占卜。不為事情貼上好壞，而是一起看「此刻能察覺什麼、整理什麼」。",
+           "supports": "支援 日本語・繁體中文・简体中文・English。",
+           "canH": "可以做的事",
+           "can": ["寫下在意的事，以及此刻的心情・處境",
+                   "會回給你以理為視角的看法（不下斷定，可放下時會說「放下也好」）",
+                   "也能從生日看「今日之理」"],
+           "sampleH": "服務範例（會這樣觀照）", "sampleLead": "這是應用程式實際回覆的一個範例。", "seeScreen": "▶ 看看登入後的畫面",
+           "lblEv": "諮詢的事：", "lblSit": "此刻的狀況：", "lblAns": "理的觀照（回應例）：",
+           "ev": "正要寄出一封重要郵件前，電腦突然當機。重開機後再看一次，才發現有一個收件人寄錯了。",
+           "sit": "想把工作快點推進，有點焦急，把確認往後擺了。",
+           "ans": "「先送出去再說」的焦急，讓你確認的眼神變淡了；就在這時被硬生生擋下，多出了重看一次的空檔——看起來是這樣的流動。與其早一步送出，先確認一手，反而常常更快。寄出前停個三秒，留下那一點小小的空檔。意義可以流過去，但那份焦急，請輕輕收下。",
+           "priceH": "費用・購買後可獲得", "priceLead": "可以先免費試用。想繼續使用的話：", "priceBig": "諮詢30次 ＝ ¥500（含稅）",
+           "p": ["購買後，將在App內發放30次諮詢的次數。",
+                 "買斷（一次性付款）。非自動續訂・非訂閱制。",
+                 "付款由 Stripe（信用卡）安全處理。"],
+           "refund": "因屬數位服務，發放後原則上恕不退款。如有問題請與我們聯絡。",
+           "privacyH": "隱私", "privacyP": "諮詢時輸入的文字不會保存，只用於當下的觀照。",
+           "useH": "使用須知", "useP": "本服務是供娛樂・自我省思的參考，不保證占卜的準確與否。並非醫療・投資・法律等專業建議。重要決定請自行判斷，必要時請諮詢專家。",
+           "startH": "開始", "startP": "目前為邀請制。持有邀請碼者可註冊。", "btnLogin": "登入", "btnRegister": "用邀請碼註冊"},
+    "cn": {"tag": "不为了算准，而是整理今天。",
+           "whatH": "关于 Kizuki",
+           "whatP": "写下在意的事，便以「理」的视角静静地观照，是一款咨询的应用程序。不是算准的占卜。不为事情贴上好坏，而是一起看「此刻能察觉什么、整理什么」。",
+           "supports": "支持 日本語・繁體中文・简体中文・English。",
+           "canH": "可以做的事",
+           "can": ["写下在意的事，以及此刻的心情・处境",
+                   "会回给你以理为视角的看法（不下断定，可放下时会说「放下也好」）",
+                   "也能从生日看「今日之理」"],
+           "sampleH": "服务范例（会这样观照）", "sampleLead": "这是应用程序实际回复的一个范例。", "seeScreen": "▶ 看看登录后的画面",
+           "lblEv": "咨询的事：", "lblSit": "此刻的状况：", "lblAns": "理的观照（回应例）：",
+           "ev": "正要寄出一封重要邮件前，电脑突然死机。重开机后再看一次，才发现有一个收件人寄错了。",
+           "sit": "想把工作快点推进，有点焦急，把确认往后摆了。",
+           "ans": "「先送出去再说」的焦急，让你确认的眼神变淡了；就在这时被硬生生挡下，多出了重看一次的空档——看起来是这样的流动。与其早一步送出，先确认一手，反而常常更快。寄出前停个三秒，留下那一点小小的空档。意义可以流过去，但那份焦急，请轻轻收下。",
+           "priceH": "费用・购买后可获得", "priceLead": "可以先免费试用。想继续使用的话：", "priceBig": "咨询30次 ＝ ¥500（含税）",
+           "p": ["购买后，将在App内发放30次咨询的次数。",
+                 "买断（一次性付款）。非自动续订・非订阅制。",
+                 "付款由 Stripe（信用卡）安全处理。"],
+           "refund": "因属数字服务，发放后原则上恕不退款。如有问题请与我们联系。",
+           "privacyH": "隐私", "privacyP": "咨询时输入的文字不会保存，只用于当下的观照。",
+           "useH": "使用须知", "useP": "本服务是供娱乐・自我省思的参考，不保证占卜的准确与否。并非医疗・投资・法律等专业建议。重要决定请自行判断，必要时请咨询专家。",
+           "startH": "开始", "startP": "目前为邀请制。持有邀请码者可注册。", "btnLogin": "登录", "btnRegister": "用邀请码注册"},
+    "en": {"tag": "Settle today, not predict it.",
+           "whatH": "About Kizuki",
+           "whatP": "Write down what's on your mind, and it is observed quietly through 'Ri' — an app for reflection, not fortune-telling. Rather than labeling events good or bad, we look together at what to notice and what to set in order, right now.",
+           "supports": "Available in Japanese, Traditional Chinese, Simplified Chinese, and English.",
+           "canH": "What you can do",
+           "can": ["Write the event on your mind and how you feel right now",
+                   "You get a reading from Ri's view — no assertions; when it's fine to let go, we say so",
+                   "From your birth date, see 'Today's Ri' too"],
+           "sampleH": "A sample (how it observes)", "sampleLead": "An example of a real reply from the app.", "seeScreen": "▶ See the screen after login",
+           "lblEv": "The event:", "lblSit": "Your situation:", "lblAns": "Ri's reading (example):",
+           "ev": "Just before sending an important email, my computer suddenly froze. After restarting and checking again, I noticed one wrong recipient.",
+           "sit": "I was rushing to get work done and had put off careful checks.",
+           "ans": "The urge to \"just send it first\" had thinned your checking eye. Right then you were forcibly stopped, and a moment to look again opened up — that's how the flow seems. Rather than sending a step early, checking one move first is often faster in the end. Try to keep that small pause, just three seconds before sending. You may let the meaning go, but do gently take in the haste itself.",
+           "priceH": "Pricing", "priceLead": "Try it free first. To keep using it:", "priceBig": "30 consultations = ¥500 (tax incl.)",
+           "p": ["After purchase, 30 consultation credits are granted in the app.",
+                 "One-time payment. No auto-renewal, no subscription.",
+                 "Payments are processed securely via Stripe (credit card)."],
+           "refund": "Due to the nature of digital services, refunds are not available after credits are granted. Please contact us with any issues.",
+           "privacyH": "Privacy", "privacyP": "Text you enter for a consultation is not saved. It is used only to observe, in the moment.",
+           "useH": "Before you use it", "useP": "This is a guide for entertainment and self-reflection. It does not guarantee any fortune-telling accuracy, and is not professional medical, investment, or legal advice. Make important decisions yourself and consult a professional when needed.",
+           "startH": "Get started", "startP": "Currently invite-only. If you have an invite code, you can register.", "btnLogin": "Log in", "btnRegister": "Register with a code"},
+}
 
-<div class="card"><h2>Kizukiとは</h2>
-<p>気になった出来事を書くと、「理（ことわり）」の視点で静かに観る、相談のためのアプリです。
-当てる占いではありません。出来事の良し悪しを決めつけず、「いま何に気づき、何を整えるとよいか」を一緒に観ます。
-日本語・繁體中文・简体中文・English に対応しています。</p></div>
 
-<div class="card"><h2>できること</h2>
-<p>・気になった出来事と、いまの気持ち・状況を書く<br>
-・理の視点での観方が返ってきます（断定せず、流してよい時は「流してよい」とお伝えします）<br>
-・生年月日から「今日の理」も見られます</p></div>
-
-<div class="card"><h2>サービスの一例（こんなふうに観ます）</h2>
-<p class="note" style="margin-bottom:8px">実際にアプリで返ってくる回答の一例です。<a href="/sample">▶ ログイン後の画面イメージを見る</a></p>
-<div style="font-size:14px;line-height:1.85;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px">
-<b>相談した出来事：</b><br>
-「大事なメールを送ろうとした直前に、パソコンが急に固まりました。再起動して見直したら、宛先を一人間違えていたことに気づきました。」<br><br>
-<b>いまの状況：</b><br>
-「仕事を早く進めようと焦っていて、確認を後回しにしていました。」<br><br>
-<b>理の観方（回答例）：</b><br>
-<span style="color:var(--sub)">焦って「先に送ろう」とする気持ちが、確かめる目を薄くしていた。そこへ強制的に止められ、もう一度見る間ができた――そんな流れに見えます。一歩早く送るより、一手確かめてから送るほうが、結局は早いことがあります。送る前に三秒だけ止まる、その小さな間を意識してみては。意味は流してもよいですが、焦りだけはそっと受け取っておいてください。</span>
-</div></div>
-
-<div class="card"><h2>料金・購入で得られるもの</h2>
-<p>まずは<b>無料でお試し</b>いただけます。続けて使いたい方は：</p>
-<p style="font-size:18px;margin:8px 0"><b>相談30回分 ＝ ¥500</b>（税込）</p>
-<p>・購入すると、アプリ内で<b>相談を30回</b>利用できる回数が付与されます。<br>
-・<b>買い切り</b>（1回きりのお支払い）。自動更新・サブスクではありません。<br>
-・お支払いは Stripe（クレジットカード）で安全に処理されます。</p>
-<p class="note">デジタルサービスの性質上、付与後の返金は原則としてお受けできません。不具合等があればお問い合わせください。</p></div>
-
-<div class="card"><h2>プライバシー</h2>
-<p>相談で入力した文章は<b>保存しません</b>。その場で観るために使うだけです。</p></div>
-
-<div class="card"><h2>ご利用にあたって</h2>
-<p class="note">本サービスは娯楽・自己内省のための目安です。占いの当たり外れを保証するものではありません。
-医療・投資・法律などの専門的な助言ではありません。重要な判断はご自身で、必要に応じて専門家にご相談ください。</p></div>
-
-<div class="card"><h2>はじめる</h2>
-<p>現在は<b>招待制</b>です。紹介コードをお持ちの方はご登録いただけます。</p>
-<a class="btn" href="/login">ログイン</a>　<a class="btn ghost" href="/register">紹介コードで登録</a></div>
-
-""" + LEGAL_CARD
+def _landing_html():
+    data = json.dumps({"L": LANDING_L, "legal": LEGAL_DATA}, ensure_ascii=False)
+    sw = "".join('<button class="ghost mini" onclick="setLP(\'%s\')">%s</button>'
+                 % (c, n) for c, n in [("ja", "日本語"), ("zh", "繁體"), ("cn", "简体"), ("en", "English")])
+    box = ('font-size:14px;line-height:1.85;background:#fff;border:1px solid var(--line);'
+           'border-radius:10px;padding:12px 14px')
+    return (
+        '<h1 translate="no">Kizuki</h1><p class="tag" id="lp_tag"></p>'
+        '<div style="text-align:center;margin:-10px 0 20px">' + sw + '</div>'
+        '<div class="card"><h2 id="lp_whatH"></h2><p id="lp_whatP"></p><p class="note" id="lp_supports"></p></div>'
+        '<div class="card"><h2 id="lp_canH"></h2><p id="lp_can"></p></div>'
+        '<div class="card"><h2 id="lp_sampleH"></h2><p class="note" id="lp_sampleLead" style="margin-bottom:8px"></p>'
+        '<div style="' + box + '"><b id="lp_lblEv"></b><br><span id="lp_ev"></span><br><br>'
+        '<b id="lp_lblSit"></b><br><span id="lp_sit"></span><br><br>'
+        '<b id="lp_lblAns"></b><br><span id="lp_ans" style="color:var(--sub)"></span></div></div>'
+        '<div class="card"><h2 id="lp_priceH"></h2><p id="lp_priceLead"></p>'
+        '<p style="font-size:18px;margin:8px 0"><b id="lp_priceBig"></b></p>'
+        '<p id="lp_p"></p><p class="note" id="lp_refund"></p></div>'
+        '<div class="card"><h2 id="lp_privacyH"></h2><p id="lp_privacyP"></p></div>'
+        '<div class="card"><h2 id="lp_useH"></h2><p class="note" id="lp_useP"></p></div>'
+        '<div class="card"><h2 id="lp_startH"></h2><p id="lp_startP"></p>'
+        '<a class="btn" href="/login" id="lp_login"></a>　<a class="btn ghost" href="/register" id="lp_register"></a></div>'
+        '<div class="card"><h2 id="lp_legalH"></h2><table id="lp_legal"></table></div>'
+        '<script>(function(){var D=' + data + ';'
+        'function el(i){return document.getElementById(i);}'
+        'function pick(){try{var s=localStorage.getItem("ricard_lang");if(s&&D.L[s])return s;}catch(e){}'
+        'var n=(navigator.language||"ja").toLowerCase();'
+        'if(n.indexOf("ja")===0)return "ja";'
+        'if(n.indexOf("zh")===0){if(n.indexOf("cn")>=0||n.indexOf("hans")>=0||n.indexOf("sg")>=0)return "cn";return "zh";}'
+        'if(n.indexOf("en")===0)return "en";return "en";}'
+        'var lang=pick();'
+        'window.setLP=function(l){lang=l;try{localStorage.setItem("ricard_lang",l);}catch(e){}render();};'
+        'function render(){var t=D.L[lang];'
+        'document.documentElement.lang=({zh:"zh-Hant",cn:"zh-Hans",en:"en"}[lang]||"ja");'
+        'el("lp_tag").textContent=t.tag;el("lp_whatH").textContent=t.whatH;el("lp_whatP").textContent=t.whatP;el("lp_supports").textContent=t.supports;'
+        'el("lp_canH").textContent=t.canH;el("lp_can").innerHTML=t.can.map(function(x){return "・"+x;}).join("<br>");'
+        'el("lp_sampleH").textContent=t.sampleH;el("lp_sampleLead").innerHTML=t.sampleLead+" <a href=\\"/sample\\">"+t.seeScreen+"</a>";'
+        'el("lp_lblEv").textContent=t.lblEv;el("lp_ev").textContent=t.ev;'
+        'el("lp_lblSit").textContent=t.lblSit;el("lp_sit").textContent=t.sit;'
+        'el("lp_lblAns").textContent=t.lblAns;el("lp_ans").textContent=t.ans;'
+        'el("lp_priceH").textContent=t.priceH;el("lp_priceLead").textContent=t.priceLead;el("lp_priceBig").textContent=t.priceBig;'
+        'el("lp_p").innerHTML=t.p.map(function(x){return "・"+x;}).join("<br>");el("lp_refund").textContent=t.refund;'
+        'el("lp_privacyH").textContent=t.privacyH;el("lp_privacyP").textContent=t.privacyP;'
+        'el("lp_useH").textContent=t.useH;el("lp_useP").textContent=t.useP;'
+        'el("lp_startH").textContent=t.startH;el("lp_startP").textContent=t.startP;'
+        'el("lp_login").textContent=t.btnLogin;el("lp_register").textContent=t.btnRegister;'
+        'var lg=D.legal[lang];el("lp_legalH").textContent=lg.heading;var h="";'
+        'for(var i=0;i<lg.rows.length;i++){h+="<tr><td style=\\"color:var(--sub);white-space:nowrap;vertical-align:top\\">"+lg.rows[i][0]+"</td><td>"+lg.rows[i][1]+"</td></tr>";}'
+        'el("lp_legal").innerHTML=h;}'
+        'render();})();</script>')
 
 
 # /sample 用：実アプリのページ(PAGE)そのものに差し込むスクリプト。
