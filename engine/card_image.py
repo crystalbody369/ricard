@@ -155,7 +155,7 @@ def render_view(view, style_name="morning", lang="ja"):
         w = draw.textlength(line, font=f_foot)
         draw.text(((W - w) / 2, fy), line, font=f_foot, fill=st["footer"])
         fy += 28
-    mark = view.get("mark", "理 カ ー ド")
+    mark = view.get("mark", "気 づ き")
     w = draw.textlength(mark, font=f_mark)
     draw.text(((W - w) / 2, H - 56), mark, font=f_mark, fill=st["label"])
 
@@ -163,9 +163,9 @@ def render_view(view, style_name="morning", lang="ja"):
 
 
 _DAILY_L = {
-    "ja": {"subtitle": "今 日 の 理", "mark": "理 カ ー ド",
+    "ja": {"subtitle": "今 日 の 理", "mark": "気 づ き",
            "labels": ["流れ", "縁・人", "動き", "整える"]},
-    "zh": {"subtitle": "今 日 之 理", "mark": "理 卡",
+    "zh": {"subtitle": "今 日 之 理", "mark": "Kizuki",
            "labels": ["流動", "緣分", "行動", "整理"]},
 }
 
