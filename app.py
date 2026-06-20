@@ -112,8 +112,9 @@ def _parse(s):
 
 
 PAGE = """<!doctype html>
-<html lang="ja"><head>
+<html lang="ja" translate="no"><head>
 <meta charset="utf-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Kizuki</title>
 <style>
@@ -868,8 +869,9 @@ def stripe_webhook():
 
 
 def _shell(title, body):
-    return Response("""<!doctype html><html lang="ja"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    return Response("""<!doctype html><html lang="ja" translate="no"><head>
+<meta charset="utf-8"><meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>""" + title + """・Kizuki</title><style>
  :root{ --bg:#fbf6ec; --bg2:#f3e7d0; --ink:#3a322a; --sub:#8a7b63; --gold:#b08a4e; --line:#e4d8c2; }
  *{box-sizing:border-box;} body{margin:0;background:linear-gradient(#fbf6ec,#f3e7d0);color:var(--ink);
