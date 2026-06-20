@@ -314,9 +314,12 @@ def change_password(username, password):
 
 
 def reset_password(username):
-    """管理者用：ランダムな仮パスワードを発行して設定し、その平文を返す（本人に伝える）。"""
+    """管理者用：ランダムな仮パスワードを発行して設定し、その平文を返す（本人に伝える）。
+    ロック中でも仮パスワードですぐ入れるよう、失敗回数とロックも同時に解除する。"""
     newpw = secrets.token_urlsafe(6)
     change_password(username, newpw)
+    with store.get_conn() as conn:
+        conn.execute("UPDATE users SET failed_count=0, locked_until=NULL WHERE username=?", (username,))
     return newpw
 
 
