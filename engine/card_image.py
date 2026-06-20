@@ -13,6 +13,19 @@ FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fonts
 F_SERIF = os.path.join(FONT_DIR, "ShipporiMincho-Regular.ttf")
 F_SERIF_DB = os.path.join(FONT_DIR, "ShipporiMincho-Bold.ttf")
 F_TC = os.path.join(FONT_DIR, "NotoSerifTC.ttf")  # 繁體中文用（OFL）
+F_SC = os.path.join(FONT_DIR, "NotoSerifSC.ttf")  # 簡体中文用（OFL）
+
+try:
+    import zhconv
+
+    def _to_simp(s):   # 繁体→簡体（cnカード用）。失敗時は原文。
+        try:
+            return zhconv.convert(s or "", "zh-hans")
+        except Exception:
+            return s
+except ImportError:
+    def _to_simp(s):
+        return s
 
 W, H = 1080, 1440
 MARGIN = 110
@@ -103,14 +116,21 @@ def _left_block(draw, x, y, text, font, fill, maxw, leading):
 
 
 def render_view(view, style_name="morning", lang="ja"):
+    if lang == "cn":   # 簡体：繁体で組まれたビューの文字を一括で簡体字に変換
+        view = dict(view)
+        for k in ("subtitle", "opening", "closing", "footer"):
+            if view.get(k):
+                view[k] = _to_simp(view[k])
+        if view.get("sections"):
+            view["sections"] = [(_to_simp(l), _to_simp(t)) for l, t in view["sections"]]
     st = STYLES[style_name]
     base = _vgrad(st["bg_top"], st["bg_bottom"]).convert("RGBA")
     if st["motif"]:
         base = _motif(base, st["motif"], st)
     draw = ImageDraw.Draw(base)
 
-    serif = F_TC if lang == "zh" else F_SERIF
-    serif_db = F_TC if lang == "zh" else F_SERIF_DB
+    serif = F_SC if lang == "cn" else F_TC if lang == "zh" else F_SERIF
+    serif_db = F_SC if lang == "cn" else F_TC if lang == "zh" else F_SERIF_DB
     f_title = _font(serif, 30)
     f_date = _font(serif, 26)
     f_open = _font(serif_db, 60)
@@ -167,11 +187,14 @@ _DAILY_L = {
            "labels": ["流れ", "縁・人", "動き", "整える"]},
     "zh": {"subtitle": "今 日 之 理", "mark": "Kizuki",
            "labels": ["流動", "緣分", "行動", "整理"]},
+    "cn": {"subtitle": "今 日 之 理", "mark": "Kizuki",
+           "labels": ["流动", "缘分", "行动", "整理"]},
 }
 
 
 def daily_view(card, lang="ja"):
-    """個人の『今日の理』カードを描画用ビューに変換（lang で言語切替）。"""
+    """個人の『今日の理』カードを描画用ビューに変換（lang で言語切替）。
+    cn（簡体）は繁体ラベルでも render_view 側で簡体字に一括変換される。"""
     L = _DAILY_L.get(lang, _DAILY_L["ja"])
     return {
         "subtitle": L["subtitle"],

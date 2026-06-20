@@ -700,15 +700,33 @@ def _server_today():
     return (date.today().year, date.today().month, date.today().day)
 
 
+def _simplify_obj(o):
+    """dict/list/str を再帰的に繁体→簡体変換（cnの詳細JSON用）。"""
+    try:
+        import zhconv
+    except ImportError:
+        return o
+    if isinstance(o, str):
+        try:
+            return zhconv.convert(o, "zh-hans")
+        except Exception:
+            return o
+    if isinstance(o, list):
+        return [_simplify_obj(x) for x in o]
+    if isinstance(o, dict):
+        return {k: _simplify_obj(v) for k, v in o.items()}
+    return o
+
+
 @app.route("/api/card")
 @login_required
 def api_card():
     b = request.args.get("b", "")
     d = request.args.get("d", "")   # 閲覧者の端末ローカル日付（その人の"今日"）
     h = request.args.get("h", "")   # 生まれた時間（任意・0〜23時）
-    lang = request.args.get("lang", "ja")
-    lang = {"cn": "zh", "en": "ja"}.get(lang, lang)   # カード画像はja/zhのみ→簡体は繁体、英語は日本語で表示
-    lang = lang if lang in ("ja", "zh") else "ja"
+    ui_lang = request.args.get("lang", "ja")
+    ui_lang = ui_lang if ui_lang in ("ja", "zh", "cn", "en") else "ja"
+    content_lang = {"cn": "zh", "en": "ja"}.get(ui_lang, ui_lang)   # 本文生成：cn→繁体, en→日本語
     try:
         birth = _parse(b)
         if h != "":
@@ -719,7 +737,8 @@ def api_card():
         target = _parse(d) if d else _server_today()
     except Exception:
         target = _server_today()
-    return _png(render(build_card(birth, target, lang), "morning", lang))
+    # 描画はui_lang：cnは簡体字に変換＋簡体フォント、enは当面日本語フォントで表示
+    return _png(render(build_card(birth, target, content_lang), "morning", ui_lang))
 
 
 @app.route("/api/en")
@@ -727,15 +746,15 @@ def api_card():
 def api_en():
     a = request.args.get("a", "")
     b = request.args.get("b", "")
-    lang = request.args.get("lang", "ja")
-    lang = {"cn": "zh", "en": "ja"}.get(lang, lang)   # カード画像はja/zhのみ→簡体は繁体、英語は日本語で表示
-    lang = lang if lang in ("ja", "zh") else "ja"
+    ui_lang = request.args.get("lang", "ja")
+    ui_lang = ui_lang if ui_lang in ("ja", "zh", "cn", "en") else "ja"
+    content_lang = {"cn": "zh", "en": "ja"}.get(ui_lang, ui_lang)
     try:
         A = _parse(a)
         B = _parse(b)
     except Exception:
         abort(400)
-    return _png(render_view(build_en(A, B, lang), "morning", lang))
+    return _png(render_view(build_en(A, B, content_lang), "morning", ui_lang))
 
 
 @app.route("/api/detail")
@@ -745,9 +764,9 @@ def api_detail():
     d = request.args.get("d", "")
     h = request.args.get("h", "")
     g = request.args.get("g", "")
-    lang = request.args.get("lang", "ja")
-    lang = {"cn": "zh", "en": "ja"}.get(lang, lang)   # カード画像はja/zhのみ→簡体は繁体、英語は日本語で表示
-    lang = lang if lang in ("ja", "zh") else "ja"
+    ui_lang = request.args.get("lang", "ja")
+    ui_lang = ui_lang if ui_lang in ("ja", "zh", "cn", "en") else "ja"
+    content_lang = {"cn": "zh", "en": "ja"}.get(ui_lang, ui_lang)
     try:
         birth = _parse(b)
         if h != "":
@@ -758,7 +777,10 @@ def api_detail():
         target = _parse(d) if d else _server_today()
     except Exception:
         target = _server_today()
-    return jsonify(build_detail(birth, target, g if g in ("m", "f") else None, lang))
+    detail = build_detail(birth, target, g if g in ("m", "f") else None, content_lang)
+    if ui_lang == "cn":   # 詳細テキストも簡体字に変換
+        detail = _simplify_obj(detail)
+    return jsonify(detail)
 
 
 @app.route("/api/profile", methods=["GET", "POST"])

@@ -4,3 +4,4 @@ flask
 gunicorn
 anthropic
 stripe
+zhconv
