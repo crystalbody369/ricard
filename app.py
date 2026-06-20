@@ -25,7 +25,7 @@ from flask import (Flask, request, send_file, abort, Response, jsonify,
 from markupsafe import escape
 
 from engine.voice import build_card
-from engine.card_image import render, render_view, F_SERIF_DB
+from engine.card_image import render, render_view, F_SERIF_DB, F_SERIF
 from engine.en import build_en
 from engine.flow import build_detail
 from engine.ri_consult import consult, translate_query_for_search
@@ -778,6 +778,59 @@ def favicon():
     return _png(_icon_png(64))
 
 
+def _og_image():
+    """リンク共有用 OGP画像(1200x630)を動的生成。X/Facebook等のリンクカード用。
+    アイコン同様ファイルを持たずコードで生成（gitignore/外部依存なし）。"""
+    from PIL import Image, ImageDraw, ImageFont
+    W, H = 1200, 630
+    bg, bg2 = (251, 246, 236), (243, 231, 208)
+    ink, sub, gold, line = (58, 50, 42), (138, 123, 99), (176, 138, 78), (228, 216, 194)
+    img = Image.new("RGB", (W, H), bg)
+    px = img.load()
+    for y in range(H):
+        t = y / H
+        row = (int(bg[0] + (bg2[0] - bg[0]) * t),
+               int(bg[1] + (bg2[1] - bg[1]) * t),
+               int(bg[2] + (bg2[2] - bg[2]) * t))
+        for x in range(W):
+            px[x, y] = row
+    d = ImageDraw.Draw(img)
+    f_small = ImageFont.truetype(F_SERIF, 34)
+    f_title = ImageFont.truetype(F_SERIF_DB, 150)
+    f_tag = ImageFont.truetype(F_SERIF_DB, 58)
+    f_sub = ImageFont.truetype(F_SERIF, 30)
+    f_foot = ImageFont.truetype(F_SERIF, 30)
+
+    def center(text, font, y, fill):
+        w = d.textlength(text, font=font)
+        d.text(((W - w) / 2, y), text, font=font, fill=fill)
+
+    d.rounded_rectangle([34, 34, W - 34, H - 34], radius=26, outline=gold, width=3)
+    d.rounded_rectangle([46, 46, W - 46, H - 46], radius=20, outline=line, width=1)
+    cx, cy, rr = W / 2, 300, 210
+    d.arc([cx - rr, cy - rr, cx + rr, cy + rr], start=15, end=320, fill=(214, 196, 160), width=10)
+    center("― きづき ―", f_small, 120, sub)
+    center("Kizuki", f_title, 170, ink)
+    center("今日を、当てずに整える。", f_tag, 400, ink)
+    center('占いではない、"当てない"相談相手。 日本語・繁体・簡体・英語の4言語。', f_sub, 485, sub)
+    center("ricard.onrender.com 　 招待コード  KIZUKI2026", f_foot, 540, gold)
+    return img
+
+
+_OG_PNG_CACHE = None
+
+
+@app.route("/og-image.png")
+def og_image():
+    global _OG_PNG_CACHE
+    if _OG_PNG_CACHE is None:
+        buf = io.BytesIO()
+        _og_image().save(buf, "PNG")
+        _OG_PNG_CACHE = buf.getvalue()
+    return Response(_OG_PNG_CACHE, mimetype="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.route("/manifest.json")
 def manifest():
     return jsonify({
@@ -1019,6 +1072,19 @@ def _shell(title, body):
 <meta name="theme-color" content="#fbf6ec">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Kizuki">
+<meta name="description" content="占いではない、&quot;当てない&quot;相談相手。今日を、当てずに整える。">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kizuki">
+<meta property="og:title" content="Kizuki ― 今日を、当てずに整える。">
+<meta property="og:description" content="占いではない、&quot;当てない&quot;相談相手。出来事を書くと理の視点で静かに観ます。日本語・繁体・簡体・英語対応。">
+<meta property="og:url" content="https://ricard.onrender.com/">
+<meta property="og:image" content="https://ricard.onrender.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Kizuki ― 今日を、当てずに整える。">
+<meta name="twitter:description" content="占いではない、&quot;当てない&quot;相談相手。">
+<meta name="twitter:image" content="https://ricard.onrender.com/og-image.png">
 <title>""" + ((title.strip() + "・Kizuki") if (title and title.strip()) else "Kizuki") + """</title><style>
  :root{ --bg:#fbf6ec; --bg2:#f3e7d0; --ink:#3a322a; --sub:#8a7b63; --gold:#b08a4e; --line:#e4d8c2; }
  *{box-sizing:border-box;} body{margin:0;background:linear-gradient(#fbf6ec,#f3e7d0);color:var(--ink);
