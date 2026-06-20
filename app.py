@@ -25,7 +25,7 @@ from flask import (Flask, request, send_file, abort, Response, jsonify,
 from markupsafe import escape
 
 from engine.voice import build_card
-from engine.card_image import render, render_view
+from engine.card_image import render, render_view, F_SERIF_DB
 from engine.en import build_en
 from engine.flow import build_detail
 from engine.ri_consult import consult, translate_query_for_search
@@ -117,6 +117,14 @@ PAGE = """<!doctype html>
 <meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Kizuki</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#fbf6ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kizuki">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
   :root{ --bg:#fbf6ec; --bg2:#f3e7d0; --ink:#3a322a; --sub:#8a7b63; --gold:#b08a4e; --line:#e4d8c2; }
   *{ box-sizing:border-box; }
@@ -270,6 +278,7 @@ PAGE = """<!doctype html>
 <script>
 function qs(id){ return document.getElementById(id); }
 function T(){ return I18N[LANG] || I18N.ja; }
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(function(){}); }
 
 var I18N = {
   ja: {h1:'Kizuki', tag:'今日を、当てずに整える。', h2today:'今日の理', gear:'⚙ 設定',
@@ -721,6 +730,63 @@ def _server_today():
     return (date.today().year, date.today().month, date.today().day)
 
 
+def _icon_png(size):
+    """アプリアイコン（理・クリーム地に金の円）を動的生成。ファビコン/ホーム画面/PWA共用。"""
+    from PIL import Image, ImageDraw, ImageFont
+    img = Image.new("RGB", (size, size), (243, 231, 208))   # クリーム #f3e7d0
+    d = ImageDraw.Draw(img)
+    cx = cy = size / 2.0
+    r = int(size * 0.37)
+    lw = max(2, int(size * 0.016))
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(176, 138, 78), width=lw)   # 金の円
+    font = ImageFont.truetype(F_SERIF_DB, int(size * 0.5))
+    bb = d.textbbox((0, 0), "理", font=font)
+    d.text((cx - (bb[2] - bb[0]) / 2.0 - bb[0], cy - (bb[3] - bb[1]) / 2.0 - bb[1]),
+           "理", font=font, fill=(58, 50, 42))   # 墨 #3a322a
+    return img
+
+
+@app.route("/icon-<int:size>.png")
+def icon(size):
+    size = size if size in (180, 192, 256, 512) else 192
+    return _png(_icon_png(size))
+
+
+@app.route("/apple-touch-icon.png")
+@app.route("/apple-touch-icon-precomposed.png")
+def apple_icon():
+    return _png(_icon_png(180))
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return _png(_icon_png(64))
+
+
+@app.route("/manifest.json")
+def manifest():
+    return jsonify({
+        "name": "Kizuki", "short_name": "Kizuki",
+        "description": "今日を、当てずに整える。",
+        "start_url": "/", "scope": "/", "display": "standalone",
+        "background_color": "#fbf6ec", "theme_color": "#fbf6ec", "lang": "ja",
+        "icons": [
+            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+        ],
+    })
+
+
+@app.route("/sw.js")
+def service_worker():
+    # 最小サービスワーカー（インストール可能要件を満たす。キャッシュはせず常に最新）。
+    js = ("self.addEventListener('install',function(e){self.skipWaiting();});"
+          "self.addEventListener('activate',function(e){e.waitUntil(self.clients.claim());});"
+          "self.addEventListener('fetch',function(e){});")
+    return Response(js, mimetype="application/javascript",
+                    headers={"Cache-Control": "no-cache"})
+
+
 def _simplify_obj(o):
     """dict/list/str を再帰的に繁体→簡体変換（cnの詳細JSON用）。"""
     try:
@@ -932,6 +998,12 @@ def _shell(title, body):
     return Response("""<!doctype html><html lang="ja" translate="no"><head>
 <meta charset="utf-8"><meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#fbf6ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kizuki">
 <title>""" + title + """・Kizuki</title><style>
  :root{ --bg:#fbf6ec; --bg2:#f3e7d0; --ink:#3a322a; --sub:#8a7b63; --gold:#b08a4e; --line:#e4d8c2; }
  *{box-sizing:border-box;} body{margin:0;background:linear-gradient(#fbf6ec,#f3e7d0);color:var(--ink);
@@ -966,6 +1038,7 @@ def _shell(title, body):
  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
 </style></head><body><div class="wrap">""" + body + """
 <script>
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(function(){}); }
 (function(){var ps=document.querySelectorAll('input[type=password]');
 for(var i=0;i<ps.length;i++){(function(inp){
  var w=document.createElement('span');w.className='pw';
