@@ -99,6 +99,20 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def wrap(*a, **kw):
+        # ① 管理画面のベーシック認証（申告書の「ベーシック認証等のアクセス制限」要件）。
+        #    アプリのログインに加えた“もう1段”の認証＝管理画面アクセスは二段階になる。
+        #    env(ADMIN_BASIC_USER/PASS)未設定のローカル開発ではスキップ＝開発は無傷。
+        #    一般ユーザーは @admin_required を通らないので一切影響なし。
+        bu = os.environ.get("ADMIN_BASIC_USER", "")
+        bp = os.environ.get("ADMIN_BASIC_PASS", "")
+        if bu and bp:
+            ba = request.authorization
+            ok = bool(ba) and ba.username == bu and secrets.compare_digest(
+                (ba.password or ""), bp)
+            if not ok:
+                return Response("管理画面の認証が必要です。", 401,
+                                {"WWW-Authenticate": 'Basic realm="Admin"'})
+        # ② アプリ側のログイン＋管理者権限チェック（既存）
         u = _current_user()
         if not u or not u["is_admin"]:
             return redirect("/login")
