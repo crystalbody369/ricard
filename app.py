@@ -263,7 +263,7 @@ PAGE = """<!doctype html>
   </div>
 
   <p class="foot" data-i18n="foot">これは娯楽・自己内省のための目安です。当たり外れを決めるものではありません。</p>
-  <p class="foot" style="margin-top:6px">運営：栄宏ライフ株式会社（Ahiro Life Co., Ltd.）　・　<a href="/legal" style="color:var(--gold)">特定商取引法に基づく表記</a></p>
+  <p class="foot" style="margin-top:6px"><span data-i18n="footown">運営</span>：栄宏ライフ株式会社（Ahiro Life Co., Ltd.）　・　<a href="/legal" style="color:var(--gold)" data-i18n="footlegal">特定商取引法に基づく表記</a></p>
   <p class="foot" style="margin-top:10px"><a href="/logout" style="color:var(--gold)" data-i18n="logout">ログアウト</a><!--ACCT--></p>
 </div>
 
@@ -290,7 +290,7 @@ var I18N = {
        paidthanks:'ご購入ありがとうございます。回数が追加されました。',
        remain:'残り{n}回', consultempty:'出来事を書いてください。', consultlimit:'今日の無料分（3回）は終わりました。また明日どうぞ。',
        consultwait:'理で観ています…', consultfail:'うまく言葉にできませんでした。少し時間をおいて、もう一度お試しください。',
-       logout:'ログアウト',
+       logout:'ログアウト', footown:'運営', footlegal:'特定商取引法に基づく表記',
        foot:'これは娯楽・自己内省のための目安です。当たり外れを決めるものではありません。', detailbase:'占いの土台：'},
   zh: {h1:'Kizuki', tag:'不為了算準，而是整理今天。', h2today:'今日之理', gear:'⚙ 設定',
        lblbirth:'你的生日', lbltime:'出生時間（若知道・可選）', lblgender:'性別（用於大運計算・可選）',
@@ -311,7 +311,7 @@ var I18N = {
        paidthanks:'感謝您的購買，次數已增加。',
        remain:'剩餘{n}次', consultempty:'請先寫下事情。', consultlimit:'今天的免費次數（3次）已用完，明天再來。',
        consultwait:'正以理觀照中…', consultfail:'這次沒能好好回應。請稍後再試一次。',
-       logout:'登出',
+       logout:'登出', footown:'營運', footlegal:'法律聲明（特定商取引法）',
        foot:'這是供娛樂、自我省思的參考，並非用來斷定準不準。', detailbase:'占算依據：'},
   cn: {h1:'Kizuki', tag:'不为了算准，而是整理今天。', h2today:'今日之理', gear:'⚙ 设置',
        lblbirth:'你的生日', lbltime:'出生时间（若知道・可选）', lblgender:'性别（用于大运计算・可选）',
@@ -332,7 +332,7 @@ var I18N = {
        paidthanks:'感谢您的购买，次数已增加。',
        remain:'剩余{n}次', consultempty:'请先写下事情。', consultlimit:'今天的免费次数（3次）已用完，明天再来。',
        consultwait:'正以理观照中…', consultfail:'这次没能好好回应。请稍后再试一次。',
-       logout:'登出',
+       logout:'登出', footown:'运营', footlegal:'法律声明（特定商取引法）',
        foot:'这是供娱乐、自我省思的参考，并非用来断定准不准。', detailbase:'推算依据：'},
   en: {h1:'Kizuki', tag:'Settle today, not predict it.', h2today:"Today's Ri", gear:'⚙ Settings',
        lblbirth:'Your date of birth', lbltime:'Time of birth (optional)', lblgender:'Gender (for fortune-cycle calc, optional)',
@@ -353,7 +353,7 @@ var I18N = {
        paidthanks:'Thank you for your purchase. Your credits have been added.',
        remain:'{n} left', consultempty:'Please write the event.', consultlimit:"Today's free uses (3) are done. Please come again tomorrow.",
        consultwait:'Observing through Ri…', consultfail:"I couldn't put it into words this time. Please wait a moment and try again.",
-       logout:'Log out',
+       logout:'Log out', footown:'Operated by', footlegal:'Legal Notice (JP Commercial Transactions Act)',
        foot:'This is a guide for entertainment and self-reflection, not a judgment of right or wrong.', detailbase:'Basis of the reading: '}
 };
 // 相談の参考例（タップで入力欄に入る）。chip=ボタンに出す短い見出し。
