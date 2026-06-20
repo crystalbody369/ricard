@@ -1,0 +1,11 @@
+# 依存ライブラリの脆弱性を毎週自動スキャンし、修正用PRを自動作成する。
+# ＝「脆弱性診断を定期的に実施し、必要な修正対応を行う」(クレジット取引セキュリティ要件)を満たす。
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
