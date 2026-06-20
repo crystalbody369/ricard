@@ -179,8 +179,8 @@ PAGE = """<!doctype html>
   <p class="tag" data-i18n="tag">今日を、当てずに整える。</p>
   <div class="langsw">
     <button class="lang" onclick="setLang('ja')">日本語</button>
-    <button class="lang" onclick="setLang('zh')">繁體中文</button>
-    <button class="lang" onclick="setLang('cn')">简体中文</button>
+    <button class="lang" onclick="setLang('zh')">繁體</button>
+    <button class="lang" onclick="setLang('cn')">简体</button>
     <button class="lang" onclick="setLang('en')">English</button>
   </div>
 
