@@ -710,7 +710,7 @@ def index():
     if not u:
         # 未ログインの人には公開ページ（4言語・ブラウザ言語自動判定）を見せる。
         # ＝Stripe審査の要件を満たしつつ、海外向けの宣伝もできる。
-        return _shell("Kizuki", _landing_html())
+        return _shell("", _landing_html())
     acct = ('  ・  <a href="/admin" style="color:var(--gold)">管理者画面</a>'
             if (u and u["is_admin"]) else "")
     resp = Response(PAGE.replace("<!--ACCT-->", acct), mimetype="text/html")
@@ -1004,7 +1004,7 @@ def _shell(title, body):
 <meta name="theme-color" content="#fbf6ec">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Kizuki">
-<title>""" + title + """・Kizuki</title><style>
+<title>""" + ((title.strip() + "・Kizuki") if (title and title.strip()) else "Kizuki") + """</title><style>
  :root{ --bg:#fbf6ec; --bg2:#f3e7d0; --ink:#3a322a; --sub:#8a7b63; --gold:#b08a4e; --line:#e4d8c2; }
  *{box-sizing:border-box;} body{margin:0;background:linear-gradient(#fbf6ec,#f3e7d0);color:var(--ink);
   font-family:"Yu Mincho","Hiragino Mincho ProN",serif;-webkit-font-smoothing:antialiased;}
