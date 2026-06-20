@@ -252,7 +252,8 @@ PAGE = """<!doctype html>
     <textarea id="cevent" maxlength="500" rows="3" data-ph="cplaceholder" oninput="qs('cchars').textContent=this.value.length" placeholder="例：道に鳥が死んでいた。朝、大きな雲を見た。古い友人に偶然会った。"></textarea>
     <div class="ccount"><span id="cchars">0</span>/500　<span id="cremain"></span></div>
     <label data-i18n="csitlabel" style="margin-top:10px">今の気持ち・状況・取り組んでいること（任意）</label>
-    <textarea id="csituation" maxlength="300" rows="2" data-ph="csitph" placeholder="例：新しい仕事を始めたばかりで不安。いろいろ手を広げて落ち着かない。"></textarea>
+    <textarea id="csituation" maxlength="300" rows="2" data-ph="csitph" oninput="qs('csitchars').textContent=this.value.length" placeholder="例：新しい仕事を始めたばかりで不安。いろいろ手を広げて落ち着かない。"></textarea>
+    <div class="ccount"><span id="csitchars">0</span>/300</div>
     <p class="note" style="text-align:left;margin:4px 0 0" data-i18n="csithint">※気持ちや状況も書くほど、あなたに合った観方になります。</p>
     <button onclick="askConsult()" id="cbtn" data-i18n="btnconsult">理に観てもらう</button>
     <p class="note" style="text-align:left" data-i18n="consultprivacy">※入力した文章はAI（Claude）に送られ、回答を作ります。文章は保存しません。</p>
