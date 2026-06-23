@@ -12,8 +12,13 @@ import sys
 import json
 import secrets
 import datetime
+import hashlib
+import time
 from functools import wraps
 from datetime import date
+
+_consult_cache = {}        # {(username, text_hash): (timestamp, result_dict)}
+_CONSULT_DEDUP_SECS = 60  # 同じテキストを60秒以内に再送した場合はキャッシュを返す
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -967,6 +972,17 @@ def api_consult():
         event = event[:CONSULT_MAX_CHARS]
     situation = (data.get("situation") or "").strip()[:CONSULT_SIT_CHARS]
     u = _current_user()
+
+    # 重複送信チェック：同じテキストを60秒以内に再送したらキャッシュを返す（消費なし）
+    text_hash = hashlib.md5((event + "\n" + situation).encode()).hexdigest()
+    cache_key = (u["username"], text_hash)
+    now = time.time()
+    if cache_key in _consult_cache:
+        cached_ts, cached_result = _consult_cache[cache_key]
+        if now - cached_ts < _CONSULT_DEDUP_SECS:
+            cached_result["balance"] = auth.get_balance(u["username"], FREE_CONSULTS)
+            return jsonify(cached_result)
+
     bal = auth.get_balance(u["username"], FREE_CONSULTS)
     if not bal["unlimited"] and bal["total"] <= 0:    # 残数なし＝購入へ
         msg = ("無料のお試し分が終わりました。続けるには、下のボタンからクレジットをご購入ください。"
@@ -986,6 +1002,7 @@ def api_consult():
         _ip_bump(ip)                         # 成功時のみカウント
         auth.consume_consult(u["username"], FREE_CONSULTS)   # 成功時のみ1回消費
         result["balance"] = auth.get_balance(u["username"], FREE_CONSULTS)
+        _consult_cache[cache_key] = (now, dict(result))      # 重複防止キャッシュに保存
     return jsonify(result)
 
 
