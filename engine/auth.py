@@ -67,6 +67,21 @@ def init_auth():
                 used       INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now','localtime'))
             )""")
+        # 使用済みメール台帳：一度登録したメールは退会・削除後も再登録不可にする（管理者は例外）
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS used_emails (
+                email      TEXT PRIMARY KEY,
+                first_used TEXT DEFAULT (datetime('now','localtime'))
+            )""")
+        # 既存ユーザー（管理者以外）のメールを台帳へ取り込む（台帳導入前の人も削除後に再登録できないように）
+        conn.execute(
+            "INSERT OR IGNORE INTO used_emails(email) "
+            "SELECT lower(email) FROM users "
+            "WHERE email IS NOT NULL AND email <> '' AND is_admin = 0")
+        # 管理者メールは再登録ブロックの例外。万一すでに台帳へ入っていたら取り除く
+        conn.execute(
+            "DELETE FROM used_emails WHERE email IN "
+            "(SELECT lower(email) FROM users WHERE is_admin = 1 AND email <> '')")
 
 
 def _valid_email(email):
@@ -282,6 +297,12 @@ def register_with_code(code, username, password, email=""):
             raise ValueError("紹介コードが無効です（存在しない・停止・期限切れ・上限到達）")
         if conn.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
             raise ValueError("そのユーザー名は既に使われています。別の名前にしてください。")
+        # メールは1つにつき1アカウント。さらに「使用済み台帳」で、退会・削除した後でも
+        # 一度使ったメールは二度と再登録できない（大文字小文字は区別しない・管理者は例外）。
+        email_lc = email.lower()
+        if (conn.execute("SELECT 1 FROM users WHERE lower(email)=?", (email_lc,)).fetchone()
+                or conn.execute("SELECT 1 FROM used_emails WHERE email=?", (email_lc,)).fetchone()):
+            raise ValueError("このメールアドレスは既に使用されています。一度登録したメールアドレスは再登録できません。")
         salt = secrets.token_hex(16)
         pwh = _hash(password, salt)
         gd = cr["grant_days"]
@@ -293,6 +314,9 @@ def register_with_code(code, username, password, email=""):
                VALUES (?, ?, ?, ?, 1, 0, ?, ?, ?)""",
             (username, pwh, salt, expires_on, "紹介:" + code, gf, email))
         conn.execute("UPDATE invite_codes SET used_count=used_count+1 WHERE code=?", (code,))
+        # 使用済みメール台帳に永久記録（このメールは今後アカウントを消しても再登録不可）。
+        # register_with_code で作られる利用者は常に一般ユーザー（管理者ではない）なので必ず記録する。
+        conn.execute("INSERT OR IGNORE INTO used_emails(email) VALUES(?)", (email_lc,))
     return expires_on
 
 
